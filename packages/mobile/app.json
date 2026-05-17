@@ -48,8 +48,7 @@
           "fonts": []
         }
       ],
-      "expo-image-picker",
-      "react-native-bluetooth-classic"
+      "expo-image-picker"
     ]
   }
 }
