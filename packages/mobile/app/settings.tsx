@@ -282,6 +282,12 @@ export default function SettingsScreen() {
               <Text style={styles.profileRowLabel}>Shop</Text>
               <Text style={styles.profileRowValue}>{session?.shop?.name ?? "—"}</Text>
             </View>
+            {!!session?.shop?.id && (
+              <View style={styles.profileRow}>
+                <Text style={styles.profileRowLabel}>Shop ID</Text>
+                <Text style={styles.profileRowValue}>{session.shop.id}</Text>
+              </View>
+            )}
             {!!session?.shop?.code && (
               <View style={styles.profileRow}>
                 <Text style={styles.profileRowLabel}>Shop Code</Text>
