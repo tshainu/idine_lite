@@ -881,11 +881,8 @@ export default function BillingScreen() {
 
             {/* Buttons */}
             <View style={s.pbBtnRow}>
-              <TouchableOpacity style={[s.pbBtn, s.pbBtnPrint]} onPress={() => handleBill(true)}>
+              <TouchableOpacity style={[s.pbBtn, s.pbBtnPrint, { flex: 1 }]} onPress={() => handleBill(true)}>
                 <Text style={s.pbBtnTxt}>Pay &amp; Print</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.pbBtn, s.pbBtnPay]} onPress={() => handleBill(false)}>
-                <Text style={s.pbBtnTxt}>Pay Only</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1174,17 +1171,17 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 12, color: Colors.text, padding: 0 },
 
   // Category tabs
-  catRow: { maxHeight: 42, backgroundColor: "#fff", borderBottomWidth: 2, borderBottomColor: "#E0E0E0" },
+  catRow: { maxHeight: 42, backgroundColor: Colors.primary, borderBottomWidth: 0 },
   catContent: { paddingHorizontal: 4, alignItems: "stretch", gap: 0 },
   catTab: {
     paddingHorizontal: 16, paddingVertical: 0,
     height: 42, justifyContent: "center", alignItems: "center",
     borderBottomWidth: 3, borderBottomColor: "transparent",
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
   },
-  catTabActive: { borderBottomColor: Colors.primary, backgroundColor: "#fff" },
-  catTabText: { fontSize: 13, color: "#888", fontWeight: "500" },
-  catTabTextActive: { color: Colors.primary, fontWeight: "700" },
+  catTabActive: { borderBottomColor: "#fff", backgroundColor: "rgba(255,255,255,0.15)" },
+  catTabText: { fontSize: 13, color: "rgba(255,255,255,0.7)", fontWeight: "500" },
+  catTabTextActive: { color: "#fff", fontWeight: "700" },
 
   // Product grid
   grid: { flex: 1, backgroundColor: "#F0F2F5", maxHeight: 700 },
@@ -1230,10 +1227,10 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 4, borderTopRightRadius: 4,
   },
   th: { fontSize: 12, fontWeight: "700", color: Colors.primary },
-  tableScroll: { height: 90 },
+  tableScroll: { height: 78 },
   tableRow: {
     flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 8, paddingVertical: 5,
+    paddingHorizontal: 8, paddingVertical: 3,
     borderBottomWidth: 1, borderBottomColor: "#F2F2F2",
   },
   td: { fontSize: 12, color: Colors.text },

@@ -143,28 +143,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Server config */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Server Configuration</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <WifiHigh size={18} color={Colors.textSecondary} />
-              <Text style={styles.cardLabel}>API URL</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={apiUrl}
-              onChangeText={setApiUrl}
-              placeholder="https://your-server.com"
-              placeholderTextColor={Colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-            <TouchableOpacity style={styles.saveBtn} onPress={saveApiUrl}>
-              <Text style={styles.saveBtnText}>Save URL</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+
 
         {/* Bluetooth Printer */}
         <View style={styles.section}>
