@@ -1,65 +1,145 @@
-# sandbox-app-template
+# iDine Lite — Restaurant POS App
 
-Monorepo: Bun workspaces + Turborepo.
+A fully offline-capable Restaurant Point of Sale (POS) mobile app built with React Native + Expo.
+
+---
+
+## Features
+
+- Billing & KOT (Kitchen Order Ticket)
+- Product & Category management
+- Portions & Units
+- Sales Dashboard with charts
+- Recent orders & Receipt
+- Offline-first (SQLite on-device)
+- Server sync when internet available
+- Navy blue theme
+
+---
+
+## Tech Stack
+
+| Layer | Tech |
+|---|---|
+| Mobile | React Native + Expo Router |
+| Language | TypeScript |
+| Database | expo-sqlite (on-device) |
+| Charts | react-native-svg |
+| Backend | Hono + Bun |
+| ORM | Drizzle |
+
+---
 
 ## Project Structure
 
 ```
-.env                         Secrets (gitignored), loaded via Vite's loadEnv
-packages/
-  web/                       Unified server (API + web frontend via Vite)
-    vite.config.ts           Vite 7 config — loads .env, sets port, registers plugins
-    index.html               Frontend HTML entry
-    vite/plugins/
-      hono-dev-plugin.ts     Intercepts /api/* in dev, forwards to Hono via SSR
-      runable-analytics-plugin.ts
-    src/
-      api/
-        index.ts             Hono routes (.basePath('api')) + AppType export
-        database/
-          index.ts           Database client (Turso/LibSQL)
-          schema.ts          Drizzle schema
-      web/
-        main.tsx             App entry
-        app.tsx              Root component + Wouter routing
-        pages/               Page components
-        components/          UI components
-        hooks/
-          use-desktop.ts     Desktop detection
-        lib/
-          api.ts             Typed API client (hono client)
-          desktop.ts         Electron API types
-          utils.ts           Shared utilities
-        styles.css           Tailwind CSS entry
-  mobile/                    Expo + React Native + expo-router
-    app/                     File-based routing
-    lib/
-      api.ts                 Typed API client
-  desktop/                   Electron shell (loads web app from server)
-    electron/
-      main.ts                Main process + IPC handlers
-      preload.ts             contextBridge API
-    vite.config.ts           Vite config
+idine-lite/
+├── packages/
+│   ├── mobile/          # React Native app (main)
+│   │   ├── app/         # Screens (Expo Router)
+│   │   ├── lib/         # DB, auth, sync, theme
+│   │   └── assets/      # Images & icons
+│   ├── web/             # Backend API (Hono + Bun)
+│   └── desktop/         # Electron (future)
+├── package.json
+└── turbo.json
 ```
+
+---
+
+## Getting Started in Runable
+
+1. Open [Runable](https://runable.com) and start a new session
+2. Tell the AI:
+   ```
+   Clone this repo and set up the project:
+   https://github.com/tshainu/idine_lite
+   ```
+3. AI will clone, install dependencies and start Metro
+4. Scan the QR code with **Expo Go** on your phone
+5. Start building!
+
+---
+
+## Running Manually
+
+### Install dependencies
+```bash
+bun install
+```
+
+### Start mobile (Metro bundler)
+```bash
+cd packages/mobile
+bunx expo start --port 4300
+```
+
+### Start backend API
+```bash
+cd packages/web
+bun run dev
+```
+
+---
 
 ## Environment Variables
 
-Secrets and credentials live in `.env` at the project root (gitignored). Vite's `loadEnv` loads them into `process.env` at dev/build time (configured in `packages/web/vite.config.ts`). In API code (Hono), use `process.env.YOUR_VAR`. In browser code, only `VITE_`-prefixed vars are exposed via `import.meta.env.VITE_YOUR_VAR`. Drizzle scripts use `bun --env-file=../../.env` to load env vars directly.
+Copy `.env.template` to `.env` in each package and fill in:
 
-## Desktop UI
-
-The desktop app has no separate renderer by default. It loads the web app from `packages/web`; desktop-specific UI should live in `packages/web/src/web/` and be gated with `useDesktop()` / `window.electronAPI`. Keep `packages/desktop` for Electron window setup, menus/tray/shortcuts, IPC handlers, native OS APIs, and packaging. Only add a separate desktop renderer when the product intentionally needs a different desktop-only UI architecture.
-
-## Servers
-
-Dev servers are started and managed automatically — no need to run them manually.
-
-## Database
-
-```sh
-cd packages/web
-bun run db:push        # Push schema to database
-bun run db:generate    # Generate migration files
-bun run db:migrate     # Run migrations
-bun run db:studio      # Open Drizzle Studio
 ```
+# packages/mobile/.env
+API_URL=http://your-server:4200
+```
+
+---
+
+## Building APK
+
+Uses **EAS (Expo Application Services)**:
+
+1. Install EAS CLI: `npm install -g eas-cli`
+2. Login: `eas login`
+3. Build: `eas build -p android --profile preview`
+
+Or use the **Publish** button in Runable mobile preview dashboard.
+
+---
+
+## Pushing Changes to GitHub
+
+```bash
+git add -A
+git commit -m "your message"
+git push
+```
+
+---
+
+## Screens
+
+| Screen | File |
+|---|---|
+| Splash | `app/index.tsx` |
+| Login | `app/login.tsx` |
+| Dashboard | `app/dashboard.tsx` |
+| Billing | `app/billing.tsx` |
+| Items | `app/items.tsx` |
+| Add Item | `app/add-item.tsx` |
+| Categories | `app/categories.tsx` |
+| Portions | `app/portions.tsx` |
+| Reports | `app/reports.tsx` |
+| Settings | `app/settings.tsx` |
+| Users | `app/users.tsx` |
+
+---
+
+## Theme
+
+All colors live in `packages/mobile/lib/theme.ts`.  
+Primary color: **Navy Blue `#0A1F44`**
+
+---
+
+## Original Development
+
+Built using [Runable](https://runable.com) AI platform — no local setup was needed during development.
