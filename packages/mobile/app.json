@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.idinelite_r7k2.runable",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A73C8"
+      },
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.INTERNET"
+      ]
+    },
+    "extra": {
+      "apiUrl": "https://j7j5e2adzj0r7hr6tyiah-preview-4200.runable.site"
+    },
+    "ios": {
+      "bundleIdentifier": "com.idinelite_r7k2.runable",
+      "supportsTablet": true
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#1A73C8"
+    },
+    "name": "iDine Lite",
+    "slug": "idine-lite",
+    "version": "1.0.0",
+    "scheme": "idine-lite",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-font",
+        {
+          "fonts": []
+        }
+      ],
+      "expo-image-picker"
+    ]
+  }
+}
