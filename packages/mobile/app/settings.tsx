@@ -249,32 +249,57 @@ export default function SettingsScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 120 }}>
 
         {/* Account */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Shop</Text>
-              <Text style={styles.infoValue}>{session?.shop?.name ?? "—"}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Username</Text>
-              <Text style={styles.infoValue}>{session?.user?.username ?? "—"}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Role</Text>
-              <View style={[styles.badge, {
-                backgroundColor: session?.user?.role === "admin"
-                  ? Colors.primaryLight : Colors.greenLight,
+        <View style={styles.profileCard}>
+          {/* Avatar */}
+          <View style={styles.avatarWrap}>
+            <Text style={styles.avatarText}>
+              {session?.user?.username
+                ? session.user.username.slice(0, 2).toUpperCase()
+                : "??"}
+            </Text>
+          </View>
+
+          {/* Name + role badge */}
+          <View style={styles.profileCenter}>
+            <Text style={styles.profileName}>{session?.user?.username ?? "—"}</Text>
+            <View style={[styles.roleBadge, {
+              backgroundColor: session?.user?.role === "admin" ? Colors.primaryLight : Colors.greenLight,
+            }]}>
+              <Text style={[styles.roleText, {
+                color: session?.user?.role === "admin" ? Colors.primary : Colors.green,
               }]}>
-                <Text style={[styles.badgeText, {
-                  color: session?.user?.role === "admin" ? Colors.primary : Colors.green,
-                }]}>
-                  {session?.user?.role?.toUpperCase() ?? "—"}
-                </Text>
-              </View>
+                {session?.user?.role?.toUpperCase() ?? "—"}
+              </Text>
             </View>
+          </View>
+
+          {/* Divider */}
+          <View style={styles.profileDivider} />
+
+          {/* Detail rows */}
+          <View style={styles.profileRows}>
+            <View style={styles.profileRow}>
+              <Text style={styles.profileRowLabel}>Shop</Text>
+              <Text style={styles.profileRowValue}>{session?.shop?.name ?? "—"}</Text>
+            </View>
+            {!!session?.shop?.code && (
+              <View style={styles.profileRow}>
+                <Text style={styles.profileRowLabel}>Shop Code</Text>
+                <Text style={styles.profileRowValue}>{session.shop.code}</Text>
+              </View>
+            )}
+            {!!session?.shop?.address && (
+              <View style={styles.profileRow}>
+                <Text style={styles.profileRowLabel}>Address</Text>
+                <Text style={[styles.profileRowValue, { flex: 2 }]}>{session.shop.address}</Text>
+              </View>
+            )}
+            {!!session?.shop?.phone && (
+              <View style={styles.profileRow}>
+                <Text style={styles.profileRowLabel}>Phone</Text>
+                <Text style={styles.profileRowValue}>{session.shop.phone}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -532,4 +557,38 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: Radius.md,
   },
   cancelText: { color: Colors.textSecondary, fontWeight: "600", fontSize: 14 },
+
+  // ── Profile card ──
+  profileCard: {
+    marginHorizontal: Spacing.lg, marginTop: Spacing.lg,
+    backgroundColor: Colors.primary, borderRadius: Radius.lg,
+    padding: Spacing.lg, alignItems: "center",
+    elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 6,
+  },
+  avatarWrap: {
+    width: 68, height: 68, borderRadius: 34,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 10,
+  },
+  avatarText: { fontSize: 26, fontWeight: "800", color: Colors.white },
+  profileCenter: { alignItems: "center", gap: 6 },
+  profileName: { fontSize: 18, fontWeight: "700", color: Colors.white },
+  roleBadge: {
+    paddingHorizontal: 12, paddingVertical: 3, borderRadius: Radius.full,
+  },
+  roleText: { fontSize: 11, fontWeight: "700" },
+  profileDivider: {
+    width: "100%", height: 1,
+    backgroundColor: "rgba(255,255,255,0.2)", marginVertical: 14,
+  },
+  profileRows: { width: "100%", gap: 8 },
+  profileRow: { flexDirection: "row", alignItems: "center" },
+  profileRowLabel: {
+    flex: 1, fontSize: 12, color: "rgba(255,255,255,0.65)", fontWeight: "500",
+  },
+  profileRowValue: {
+    flex: 2, fontSize: 13, color: Colors.white, fontWeight: "600", textAlign: "right",
+  },
 });
