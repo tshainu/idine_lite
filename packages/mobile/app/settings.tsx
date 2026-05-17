@@ -70,6 +70,7 @@ export default function SettingsScreen() {
   const [btAddr, setBtAddr] = useState("");
   const [wifiIp, setWifiIp] = useState("");
   const [wifiPort, setWifiPort] = useState("9100");
+  const [printerType, setPrinterType] = useState<"bluetooth" | "wifi">("bluetooth");
   const [session, setSession] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -85,11 +86,12 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     const load = async () => {
-      const [url, bt, ip, port, s, last] = await Promise.all([
+      const [url, bt, ip, port, ptype, s, last] = await Promise.all([
         store.getApiUrl(),
         store.getPrinterAddress(),
         store.getWifiPrinterIp(),
         store.getWifiPrinterPort(),
+        store.getPrinterType(),
         (async () => {
           const { getSession } = await import("../lib/auth");
           return getSession();
@@ -100,11 +102,17 @@ export default function SettingsScreen() {
       setBtAddr(bt ?? "");
       setWifiIp(ip);
       setWifiPort(port);
+      setPrinterType(ptype);
       setSession(s);
       setLastSync(last);
     };
     load();
   }, []);
+
+  const selectPrinterType = async (type: "bluetooth" | "wifi") => {
+    setPrinterType(type);
+    await store.setPrinterType(type);
+  };
 
   // ── BT scan ────────────────────────────────────────────────────
   const openBtScan = useCallback(async () => {
@@ -309,103 +317,109 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Bluetooth Printer */}
+        {/* Printer Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bluetooth Printer</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <BluetoothConnected size={18} color="#1565C0" />
-              <Text style={styles.cardLabel}>Printer Address</Text>
-            </View>
+          <Text style={styles.sectionTitle}>Printer</Text>
 
-            {/* Scan button */}
-            <TouchableOpacity style={styles.scanBtn} onPress={openBtScan}>
-              <MagnifyingGlass size={16} color="#1565C0" />
-              <Text style={styles.scanBtnText}>Scan for Printers</Text>
+          {/* Type selector */}
+          <View style={styles.printerToggle}>
+            <TouchableOpacity
+              style={[styles.printerToggleBtn, printerType === "bluetooth" && styles.printerToggleBtnActive]}
+              onPress={() => selectPrinterType("bluetooth")}
+            >
+              <BluetoothConnected size={18} color={printerType === "bluetooth" ? Colors.white : "#1565C0"} />
+              <Text style={[styles.printerToggleBtnText, printerType === "bluetooth" && styles.printerToggleBtnTextActive]}>
+                Bluetooth
+              </Text>
             </TouchableOpacity>
-
-            <Text style={styles.helperText}>Or enter MAC address manually:</Text>
-            <Text style={[styles.helperText, { marginTop: 2 }]}>Format: 00:11:22:33:44:55</Text>
-            <TextInput
-              style={styles.input}
-              value={btAddr}
-              onChangeText={setBtAddr}
-              placeholder="e.g. 00:11:22:33:44:55"
-              placeholderTextColor={Colors.textMuted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-
-            <View style={styles.btnRow}>
-              <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: "#BBDEFB", flex: 1 }]}
-                onPress={saveBtPrinter}
-              >
-                <Text style={[styles.saveBtnText, { color: "#1565C0" }]}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.testBtn, { flex: 1 }]}
-                onPress={testBtPrinter}
-                disabled={testingBt}
-              >
-                {testingBt
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <><Printer size={15} color="#fff" /><Text style={styles.testBtnText}>Test Page</Text></>
-                }
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.printerToggleBtn, printerType === "wifi" && styles.printerToggleBtnActiveWifi]}
+              onPress={() => selectPrinterType("wifi")}
+            >
+              <Printer size={18} color={printerType === "wifi" ? Colors.white : "#00695C"} />
+              <Text style={[styles.printerToggleBtnText, printerType === "wifi" && styles.printerToggleBtnTextActive]}>
+                WiFi / Network
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* WiFi Printer */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>WiFi / Network Printer</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <Printer size={18} color="#00695C" />
-              <Text style={styles.cardLabel}>IP Address</Text>
+          {/* Bluetooth config */}
+          {printerType === "bluetooth" && (
+            <View style={[styles.card, { marginTop: 12 }]}>
+              <View style={styles.infoRow}>
+                <BluetoothConnected size={18} color="#1565C0" />
+                <Text style={styles.cardLabel}>Printer Address</Text>
+              </View>
+              <TouchableOpacity style={styles.scanBtn} onPress={openBtScan}>
+                <MagnifyingGlass size={16} color="#1565C0" />
+                <Text style={styles.scanBtnText}>Scan for Printers</Text>
+              </TouchableOpacity>
+              <Text style={styles.helperText}>Or enter MAC address manually:</Text>
+              <Text style={[styles.helperText, { marginTop: 2 }]}>Format: 00:11:22:33:44:55</Text>
+              <TextInput
+                style={styles.input}
+                value={btAddr}
+                onChangeText={setBtAddr}
+                placeholder="e.g. 00:11:22:33:44:55"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <View style={styles.btnRow}>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: "#BBDEFB", flex: 1 }]} onPress={saveBtPrinter}>
+                  <Text style={[styles.saveBtnText, { color: "#1565C0" }]}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.testBtn, { flex: 1 }]} onPress={testBtPrinter} disabled={testingBt}>
+                  {testingBt
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <><Printer size={15} color="#fff" /><Text style={styles.testBtnText}>Test Page</Text></>
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.helperText}>e.g. 192.168.1.100</Text>
-            <TextInput
-              style={styles.input}
-              value={wifiIp}
-              onChangeText={setWifiIp}
-              placeholder="192.168.1.100"
-              placeholderTextColor={Colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="numeric"
-            />
-            <Text style={[styles.cardLabel, { marginTop: 10 }]}>Port</Text>
-            <Text style={styles.helperText}>Default: 9100</Text>
-            <TextInput
-              style={styles.input}
-              value={wifiPort}
-              onChangeText={setWifiPort}
-              placeholder="9100"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="number-pad"
-            />
+          )}
 
-            <View style={styles.btnRow}>
-              <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: "#B2DFDB", flex: 1 }]}
-                onPress={saveWifiPrinter}
-              >
-                <Text style={[styles.saveBtnText, { color: "#00695C" }]}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.testBtn, { flex: 1, backgroundColor: "#00695C" }]}
-                onPress={testWifiPrinter}
-                disabled={testingWifi}
-              >
-                {testingWifi
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <><Printer size={15} color="#fff" /><Text style={styles.testBtnText}>Test Page</Text></>
-                }
-              </TouchableOpacity>
+          {/* WiFi config */}
+          {printerType === "wifi" && (
+            <View style={[styles.card, { marginTop: 12 }]}>
+              <View style={styles.infoRow}>
+                <Printer size={18} color="#00695C" />
+                <Text style={styles.cardLabel}>IP Address</Text>
+              </View>
+              <Text style={styles.helperText}>e.g. 192.168.1.100</Text>
+              <TextInput
+                style={styles.input}
+                value={wifiIp}
+                onChangeText={setWifiIp}
+                placeholder="192.168.1.100"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numeric"
+              />
+              <Text style={[styles.cardLabel, { marginTop: 6 }]}>Port</Text>
+              <Text style={styles.helperText}>Default: 9100</Text>
+              <TextInput
+                style={styles.input}
+                value={wifiPort}
+                onChangeText={setWifiPort}
+                placeholder="9100"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="number-pad"
+              />
+              <View style={styles.btnRow}>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: "#B2DFDB", flex: 1 }]} onPress={saveWifiPrinter}>
+                  <Text style={[styles.saveBtnText, { color: "#00695C" }]}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.testBtn, { flex: 1, backgroundColor: "#00695C" }]} onPress={testWifiPrinter} disabled={testingWifi}>
+                  {testingWifi
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <><Printer size={15} color="#fff" /><Text style={styles.testBtnText}>Test Page</Text></>
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {/* App Info */}
@@ -479,6 +493,29 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 13,
     color: Colors.text, backgroundColor: Colors.surface,
+  },
+
+  // printer type toggle
+  printerToggle: {
+    flexDirection: "row", borderRadius: Radius.md, overflow: "hidden",
+    borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  printerToggleBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 12, backgroundColor: Colors.white,
+  },
+  printerToggleBtnActive: {
+    backgroundColor: "#1565C0",
+  },
+  printerToggleBtnActiveWifi: {
+    backgroundColor: "#00695C",
+  },
+  printerToggleBtnText: {
+    fontSize: 13, fontWeight: "700", color: Colors.textSecondary,
+  },
+  printerToggleBtnTextActive: {
+    color: Colors.white,
   },
 
   // scan

@@ -9,6 +9,7 @@ const KEYS = {
   PRINTER_ADDRESS: "idine_printer_address",
   WIFI_PRINTER_IP: "idine_wifi_printer_ip",
   WIFI_PRINTER_PORT: "idine_wifi_printer_port",
+  PRINTER_TYPE: "idine_printer_type",
 };
 
 export interface AuthUser {
@@ -78,6 +79,13 @@ export const store = {
   },
   async setWifiPrinterPort(port: string) {
     return AsyncStorage.setItem(KEYS.WIFI_PRINTER_PORT, port);
+  },
+  async getPrinterType(): Promise<"bluetooth" | "wifi"> {
+    const val = await AsyncStorage.getItem(KEYS.PRINTER_TYPE);
+    return (val as "bluetooth" | "wifi") ?? "bluetooth";
+  },
+  async setPrinterType(type: "bluetooth" | "wifi") {
+    return AsyncStorage.setItem(KEYS.PRINTER_TYPE, type);
   },
   async clearAuth() {
     return AsyncStorage.multiRemove([KEYS.AUTH_TOKEN, KEYS.AUTH_USER, KEYS.AUTH_SHOP]);
