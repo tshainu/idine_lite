@@ -18,23 +18,33 @@ import { syncWithServer } from "../lib/sync";
 // ── BT device type ──────────────────────────────────────────────
 interface BTDevice { id: string; name: string }
 
+// ── BT: guard against Expo Go (native module = null) ───────────
+function getBTModule() {
+  if (!RNBluetoothClassic || typeof RNBluetoothClassic.getBondedDevices !== "function") {
+    throw new Error("Bluetooth is not available in Expo Go.\nBuild an APK to use this feature.");
+  }
+  return RNBluetoothClassic;
+}
+
 // ── BT scan: bonded (paired) devices ───────────────────────────
 async function scanBluetoothDevices(): Promise<BTDevice[]> {
-  const bonded: any[] = await RNBluetoothClassic.getBondedDevices();
+  const bt = getBTModule();
+  const bonded: any[] = await bt.getBondedDevices();
   return bonded.map((d: any) => ({ id: d.address ?? d.id, name: d.name ?? d.address }));
 }
 
 async function sendTestPageBluetooth(addr: string): Promise<void> {
-  const connected = await RNBluetoothClassic.connectToDevice(addr);
+  const bt = getBTModule();
+  const connected = await bt.connectToDevice(addr);
   const testEsc =
-    "\x1B\x40" +           // Init
-    "\x1B\x61\x01" +       // Center
-    "\x1B\x21\x10" +       // Double height
+    "\x1B\x40" +
+    "\x1B\x61\x01" +
+    "\x1B\x21\x10" +
     "iDine Lite\n" +
-    "\x1B\x21\x00" +       // Normal
+    "\x1B\x21\x00" +
     "--- TEST PAGE ---\n" +
     new Date().toLocaleString() + "\n\n\n" +
-    "\x1D\x56\x00";        // Cut
+    "\x1D\x56\x00";
   await connected.write(testEsc);
   await connected.disconnect();
 }
