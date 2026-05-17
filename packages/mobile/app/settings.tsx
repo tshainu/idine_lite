@@ -6,9 +6,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import {
-  ArrowLeft, WifiHigh, Printer, SignOut, Info,
+  ArrowLeft, Printer, SignOut, Info,
   ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass,
 } from "phosphor-react-native";
+import RNBluetoothClassic from "react-native-bluetooth-classic";
 import { Colors, Spacing, Radius, Typography } from "../lib/theme";
 import { store } from "../lib/store";
 import { logoutUser } from "../lib/auth";
@@ -17,41 +18,25 @@ import { syncWithServer } from "../lib/sync";
 // ── BT device type ──────────────────────────────────────────────
 interface BTDevice { id: string; name: string }
 
-// ── Minimal BT scan using expo-modules (graceful fallback) ──────
+// ── BT scan: bonded (paired) devices ───────────────────────────
 async function scanBluetoothDevices(): Promise<BTDevice[]> {
-  try {
-    // Try react-native-bluetooth-classic if available
-    // @ts-ignore
-    const RNBluetoothClassic = (await import("react-native-bluetooth-classic")).default;
-    const bonded: any[] = await RNBluetoothClassic.getBondedDevices();
-    return bonded.map((d: any) => ({ id: d.address ?? d.id, name: d.name ?? d.address }));
-  } catch {
-    // Library not installed — return demo list so UI works
-    return [
-      { id: "SCAN_NOT_AVAILABLE", name: "BT library not installed" },
-    ];
-  }
+  const bonded: any[] = await RNBluetoothClassic.getBondedDevices();
+  return bonded.map((d: any) => ({ id: d.address ?? d.id, name: d.name ?? d.address }));
 }
 
 async function sendTestPageBluetooth(addr: string): Promise<void> {
-  try {
-    // @ts-ignore
-    const RNBluetoothClassic = (await import("react-native-bluetooth-classic")).default;
-    const connected = await RNBluetoothClassic.connectToDevice(addr);
-    const testEsc =
-      "\x1B\x40" +           // Init
-      "\x1B\x61\x01" +       // Center
-      "\x1B\x21\x10" +       // Double height
-      "iDine Lite\n" +
-      "\x1B\x21\x00" +       // Normal
-      "--- TEST PAGE ---\n" +
-      new Date().toLocaleString() + "\n\n\n" +
-      "\x1D\x56\x00";        // Cut
-    await connected.write(testEsc);
-    await connected.disconnect();
-  } catch (e: any) {
-    throw new Error(e?.message ?? "Bluetooth print failed");
-  }
+  const connected = await RNBluetoothClassic.connectToDevice(addr);
+  const testEsc =
+    "\x1B\x40" +           // Init
+    "\x1B\x61\x01" +       // Center
+    "\x1B\x21\x10" +       // Double height
+    "iDine Lite\n" +
+    "\x1B\x21\x00" +       // Normal
+    "--- TEST PAGE ---\n" +
+    new Date().toLocaleString() + "\n\n\n" +
+    "\x1D\x56\x00";        // Cut
+  await connected.write(testEsc);
+  await connected.disconnect();
 }
 
 async function sendTestPageWifi(ip: string, port: string): Promise<void> {
@@ -137,14 +122,6 @@ export default function SettingsScreen() {
   }, []);
 
   const selectDevice = useCallback(async (device: BTDevice) => {
-    if (device.id === "SCAN_NOT_AVAILABLE") {
-      setScanVisible(false);
-      Alert.alert(
-        "Library Missing",
-        "Install react-native-bluetooth-classic to enable BT scanning.",
-      );
-      return;
-    }
     setBtAddr(device.id);
     await store.setPrinterAddress(device.id);
     setScanVisible(false);
