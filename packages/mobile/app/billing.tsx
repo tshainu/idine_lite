@@ -12,6 +12,7 @@ import {
 import { Colors, Spacing, Radius } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
+import { store } from "../lib/store";
 import * as Crypto from "expo-crypto";
 
 interface Category { id: number; name: string; }
@@ -249,6 +250,10 @@ export default function BillingScreen() {
   const [discount, setDiscount] = useState(0);
   const [session, setSession] = useState<any>(null);
   const [billNo, setBillNo] = useState(1);
+  const [printerType, setPrinterType] = useState<"bluetooth" | "wifi">("bluetooth");
+  const [printerAddr, setPrinterAddr] = useState("");
+  const [wifiPrinterIp, setWifiPrinterIp] = useState("");
+  const [wifiPrinterPort, setWifiPrinterPort] = useState("9100");
 
   // Drawer animation
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -299,6 +304,18 @@ export default function BillingScreen() {
   useEffect(() => {
     getSession().then(setSession);
     loadData();
+    // Load printer config
+    Promise.all([
+      store.getPrinterType(),
+      store.getPrinterAddress(),
+      store.getWifiPrinterIp(),
+      store.getWifiPrinterPort(),
+    ]).then(([ptype, addr, ip, port]) => {
+      setPrinterType(ptype);
+      setPrinterAddr(addr ?? "");
+      setWifiPrinterIp(ip);
+      setWifiPrinterPort(port);
+    });
   }, []);
 
   const loadData = () => {
@@ -529,6 +546,80 @@ export default function BillingScreen() {
       setReceiptData(data);
       setReceiptModal(true);
     }, 350);
+  };
+
+  const handlePrintReceipt = async (data: typeof receiptData) => {
+    if (!data) return;
+
+    // Build ESC/POS string
+    const fmt = (n: number) => n.toLocaleString("en-LK");
+    const line = (l: string, r: string, w = 32) => {
+      const gap = Math.max(1, w - l.length - r.length);
+      return l + " ".repeat(gap) + r + "\n";
+    };
+    let esc =
+      "\x1B\x40" +        // init
+      "\x1B\x61\x01" +    // center
+      "\x1B\x21\x10" +    // double height
+      `${data.shopName}\n` +
+      "\x1B\x21\x00" +    // normal
+      (data.shopAddress ? `${data.shopAddress}\n` : "") +
+      "--------------------------------\n" +
+      "\x1B\x61\x00" +    // left
+      `Bill: ${String(data.billNo).padStart(3,"0")}   ${data.date} ${data.time}\n` +
+      `Cashier: ${data.cashier}\n` +
+      "--------------------------------\n";
+    data.items.forEach(it => {
+      esc += line(`${it.name} x${it.qty}`, `Rs.${fmt(it.amt)}`);
+    });
+    esc +=
+      "--------------------------------\n" +
+      line("Sub Total", `Rs.${fmt(data.subtotal)}`) +
+      (data.discount > 0 ? line("Discount", `-Rs.${fmt(data.discount)}`) : "") +
+      "\x1B\x21\x10" +    // double height
+      line("NET PAY", `Rs.${fmt(data.total)}`) +
+      "\x1B\x21\x00" +    // normal
+      line("Paid", `Rs.${fmt(data.paid)}`) +
+      line("Balance", `Rs.${fmt(data.balance)}`) +
+      "--------------------------------\n" +
+      "\x1B\x61\x01" +    // center
+      "Thank you! Come again\n\n\n" +
+      "\x1D\x56\x00";     // cut
+
+    try {
+      if (printerType === "wifi") {
+        if (!wifiPrinterIp) {
+          Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings.");
+          return;
+        }
+        const res = await fetch(`http://${wifiPrinterIp}:${wifiPrinterPort || "9100"}`, {
+          method: "POST", body: esc,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } else {
+        if (!printerAddr) {
+          Alert.alert("No Bluetooth Printer", "Set Bluetooth printer address in Settings.");
+          return;
+        }
+        try {
+          const RNBt = require("react-native-bluetooth-classic").default;
+          if (!RNBt || typeof RNBt.connectToDevice !== "function") throw new Error("native");
+          const dev = await RNBt.connectToDevice(printerAddr);
+          await dev.write(esc);
+          await dev.disconnect();
+        } catch (e: any) {
+          if (e?.message === "native") {
+            Alert.alert("Bluetooth Not Available", "Bluetooth printing requires a built APK (not Expo Go).");
+          } else {
+            throw e;
+          }
+          return;
+        }
+      }
+      Alert.alert("Printed", "Receipt sent to printer.");
+    } catch (e: any) {
+      Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
+    }
   };
 
   const handleKOT = () => {
@@ -1010,8 +1101,8 @@ export default function BillingScreen() {
                 <TouchableOpacity style={{ flex: 1, backgroundColor: "#00BCD4", paddingVertical: 16, alignItems: "center" }} onPress={() => setReceiptModal(false)}>
                   <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>＋ New Bill</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{ flex: 1, backgroundColor: "#FF9800", paddingVertical: 16, alignItems: "center" }} onPress={() => Alert.alert("Print", "Connect Bluetooth printer to print.")}>
-                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>🖨 Print</Text>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: "#FF9800", paddingVertical: 16, alignItems: "center" }} onPress={() => handlePrintReceipt(receiptData)}>
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>🖨 {printerType === "wifi" ? "WiFi Print" : "BT Print"}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={{ flex: 1, backgroundColor: "#25D366", paddingVertical: 16, alignItems: "center" }} onPress={() => {
                   if (!receiptData) return;
