@@ -592,10 +592,16 @@ export default function BillingScreen() {
           Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings.");
           return;
         }
-        const res = await fetch(`http://${wifiPrinterIp}:${wifiPrinterPort || "9100"}`, {
-          method: "POST", body: esc,
+        const apiUrl = await store.getApiUrl();
+        // encode ESC/POS as base64 so it survives JSON transport
+        const b64 = btoa(unescape(encodeURIComponent(esc)));
+        const res = await fetch(`${apiUrl}/api/print/wifi`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ip: wifiPrinterIp, port: parseInt(wifiPrinterPort || "9100"), data: b64 }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json() as any;
+        if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
       } else {
         if (!printerAddr) {
           Alert.alert("No Bluetooth Printer", "Set Bluetooth printer address in Settings.");
