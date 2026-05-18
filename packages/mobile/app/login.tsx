@@ -116,7 +116,13 @@ export default function LoginScreen() {
             }
           </TouchableOpacity>
 
-          <Text style={s.forgot}>Forgot username or password</Text>
+          <TouchableOpacity onPress={() => Alert.alert(
+            "Forgot Password?",
+            "Please contact iDine support to reset your password:\n\n📧 idinelite@axisxnor.com\n📞 +94 711336666",
+            [{ text: "OK" }]
+          )}>
+            <Text style={s.forgot}>Forgot username or password?</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

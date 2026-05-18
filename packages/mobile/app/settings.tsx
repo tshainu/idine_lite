@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, FlatList, ActivityIndicator, Modal,
@@ -8,7 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import {
   ArrowLeft, Printer, SignOut, Info,
-  ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass, CookingPot,
+  ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass, CookingPot, LockKey,
 } from "phosphor-react-native";
 import RNBluetoothClassic from "react-native-bluetooth-classic";
 import { printWifi, printBluetooth, buildTestEsc, buildKotEsc, type PaperSize } from "../lib/printer";
@@ -88,6 +88,12 @@ export default function SettingsScreen() {
   const [kotPrinterIp, setKotPrinterIp] = useState("");
   const [kotPrinterPort, setKotPrinterPort] = useState("9100");
   const [testingKot, setTestingKot] = useState(false);
+
+  // Change password
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [changingPw, setChangingPw] = useState(false);
 
   // BT scan state
   const [scanVisible, setScanVisible] = useState(false);
@@ -262,6 +268,43 @@ export default function SettingsScreen() {
     const now = new Date().toLocaleString();
     setLastSync(now);
     Alert.alert(res.success ? "Sync Complete" : "Sync Failed", res.error ?? "Data synced successfully");
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPw || !newPw || !confirmPw) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      Alert.alert("Error", "New passwords do not match");
+      return;
+    }
+    if (newPw.length < 4) {
+      Alert.alert("Error", "New password must be at least 4 characters");
+      return;
+    }
+    setChangingPw(true);
+    try {
+      const { getSession } = await import("../lib/auth");
+      const s = await getSession();
+      const apiUrl = await store.getApiUrl();
+      const res = await fetch(`${apiUrl}/api/auth/change-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${s?.token}`,
+        },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to change password");
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+      Alert.alert("Success", "Password changed successfully");
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Something went wrong");
+    } finally {
+      setChangingPw(false);
+    }
   };
 
   const handleLogout = () => {
@@ -590,6 +633,51 @@ export default function SettingsScreen() {
                 </View>
               </View>
             )}
+          </View>
+        </View>
+
+        {/* Change Password */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Change Password</Text>
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <LockKey size={18} color={Colors.primary} />
+              <Text style={styles.cardLabel}>Update your password</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Current password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              value={currentPw}
+              onChangeText={setCurrentPw}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="New password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              value={newPw}
+              onChangeText={setNewPw}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm new password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              value={confirmPw}
+              onChangeText={setConfirmPw}
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: Colors.primary, alignItems: "center" }]}
+              onPress={handleChangePassword}
+              disabled={changingPw}
+            >
+              {changingPw
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={[styles.saveBtnText, { color: "#fff" }]}>Change Password</Text>
+              }
+            </TouchableOpacity>
           </View>
         </View>
 
