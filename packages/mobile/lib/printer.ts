@@ -1,11 +1,10 @@
 import { Platform } from "react-native";
 
-export type PaperSize = "58" | "75" | "80";
+export type PaperSize = "58" | "80";
 
-// Characters per line: 58mm → 32, 75mm → 42, 80mm → 48
+// Characters per line: 58mm → 32, 80mm → 48
 export function getLineWidth(paper: PaperSize): number {
   if (paper === "80") return 48;
-  if (paper === "75") return 42;
   return 32;
 }
 
@@ -45,7 +44,7 @@ export function buildReceiptEsc(
   const W = getLineWidth(paper);
   const fmt = (n: number) => n.toLocaleString("en-LK");
   const div = divider(W);
-  const is80 = paper === "80" || paper === "75";
+  const is80 = paper === "80";
 
   let esc =
     "\x1B\x40" +          // init printer
@@ -88,7 +87,7 @@ export function buildReceiptEsc(
 
   // ── Items table header ──
   esc +=
-    lr("#  ITEM", "QTY  PRICE    AMT", W) +
+    lr("#  ITEM", is80 ? "QTY  PRICE    AMT" : "QTY    AMT", W) +
     div;
 
   // ── Items ──
@@ -96,7 +95,9 @@ export function buildReceiptEsc(
     const idx = `${i + 1}`;
     const nameCol = `${idx}  ${it.name}`;
     const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
-    const rightCol = `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`;
+    const rightCol = is80
+      ? `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`
+      : `${it.qty}  Rs.${fmt(it.amt)}`;
     esc += lr(nameCol, rightCol, W);
   });
 
@@ -177,7 +178,7 @@ export function buildKotEsc(
 ): string {
   const W = getLineWidth(paper);
   const div = divider(W);
-  const is80 = paper === "80" || paper === "75";
+  const is80 = paper === "80";
 
   let esc =
     "\x1B\x40" +              // init
