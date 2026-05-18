@@ -2,14 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, FlatList, ActivityIndicator, Modal,
+  PermissionsAndroid, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import {
   ArrowLeft, Printer, SignOut, Info,
-  ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass,
+  ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass, CookingPot,
 } from "phosphor-react-native";
 import RNBluetoothClassic from "react-native-bluetooth-classic";
+import { printWifi, printBluetooth, buildTestEsc, buildKotEsc, type PaperSize } from "../lib/printer";
 import { Colors, Spacing, Radius, Typography } from "../lib/theme";
 import { store } from "../lib/store";
 import { logoutUser } from "../lib/auth";
@@ -28,49 +30,43 @@ function getBTModule() {
 
 // ── BT scan: bonded (paired) devices ───────────────────────────
 async function scanBluetoothDevices(): Promise<BTDevice[]> {
+  // Android 12+ requires runtime permissions before any BT call
+  if (Platform.OS === "android") {
+    const perms = [
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    ];
+    const granted = await PermissionsAndroid.requestMultiple(perms);
+    const allGranted = Object.values(granted).every(
+      (r) => r === PermissionsAndroid.RESULTS.GRANTED
+    );
+    if (!allGranted) {
+      throw new Error("Bluetooth permissions denied. Please allow Bluetooth and Location permissions in App Settings.");
+    }
+  }
+
   const bt = getBTModule();
+  try {
+    const enabled = await bt.isBluetoothEnabled();
+    if (!enabled) {
+      await bt.requestBluetoothEnabled();
+    }
+  } catch {
+    // Some devices throw if BT already enabled — safe to ignore
+  }
   const bonded: any[] = await bt.getBondedDevices();
   return bonded.map((d: any) => ({ id: d.address ?? d.id, name: d.name ?? d.address }));
 }
 
-async function sendTestPageBluetooth(addr: string): Promise<void> {
-  const bt = getBTModule();
-  const connected = await bt.connectToDevice(addr);
-  const testEsc =
-    "\x1B\x40" +
-    "\x1B\x61\x01" +
-    "\x1B\x21\x10" +
-    "iDine Lite\n" +
-    "\x1B\x21\x00" +
-    "--- TEST PAGE ---\n" +
-    new Date().toLocaleString() + "\n\n\n" +
-    "\x1D\x56\x00";
-  await connected.write(testEsc);
-  await connected.disconnect();
+async function sendTestPageBluetooth(addr: string, paper: PaperSize): Promise<void> {
+  const esc = buildTestEsc(paper);
+  await printBluetooth(addr, esc);
 }
 
-async function sendTestPageWifi(ip: string, port: string): Promise<void> {
-  // Uses fetch via TCP proxy — works where net module is unavailable
-  // Falls back to a graceful alert if not available
-  try {
-    const testEsc =
-      "\x1B\x40" +
-      "\x1B\x61\x01" +
-      "\x1B\x21\x10" +
-      "iDine Lite\n" +
-      "\x1B\x21\x00" +
-      "--- TEST PAGE ---\n" +
-      new Date().toLocaleString() + "\n\n\n" +
-      "\x1D\x56\x00";
-
-    const res = await fetch(`http://${ip}:${port}`, {
-      method: "POST",
-      body: testEsc,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  } catch (e: any) {
-    throw new Error(e?.message ?? "WiFi print failed");
-  }
+async function sendTestPageWifi(ip: string, port: string, paper: PaperSize): Promise<void> {
+  const esc = buildTestEsc(paper);
+  await printWifi(ip, parseInt(port) || 9100, esc);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -81,9 +77,17 @@ export default function SettingsScreen() {
   const [wifiIp, setWifiIp] = useState("");
   const [wifiPort, setWifiPort] = useState("9100");
   const [printerType, setPrinterType] = useState<"bluetooth" | "wifi">("bluetooth");
+  const [paperSize, setPaperSize] = useState<PaperSize>("58");
+  const [receiptFooter, setReceiptFooter] = useState("Thank you! Come again");
   const [session, setSession] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+
+  // KOT printer
+  const [kotPrinterEnabled, setKotPrinterEnabled] = useState(false);
+  const [kotPrinterIp, setKotPrinterIp] = useState("");
+  const [kotPrinterPort, setKotPrinterPort] = useState("9100");
+  const [testingKot, setTestingKot] = useState(false);
 
   // BT scan state
   const [scanVisible, setScanVisible] = useState(false);
@@ -96,25 +100,35 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     const load = async () => {
-      const [url, bt, ip, port, ptype, s, last] = await Promise.all([
+      const [url, bt, ip, port, ptype, paper, footer, s, last, kotEnabled, kotIp, kotPort] = await Promise.all([
         store.getApiUrl(),
         store.getPrinterAddress(),
         store.getWifiPrinterIp(),
         store.getWifiPrinterPort(),
         store.getPrinterType(),
+        store.getPaperSize(),
+        store.getReceiptFooter(),
         (async () => {
           const { getSession } = await import("../lib/auth");
           return getSession();
         })(),
         store.getLastSync(),
+        store.getKotPrinterEnabled(),
+        store.getKotPrinterIp(),
+        store.getKotPrinterPort(),
       ]);
       setApiUrl(url);
       setBtAddr(bt ?? "");
       setWifiIp(ip);
       setWifiPort(port);
       setPrinterType(ptype);
+      setPaperSize(paper);
+      setReceiptFooter(footer);
       setSession(s);
       setLastSync(last);
+      setKotPrinterEnabled(kotEnabled);
+      setKotPrinterIp(kotIp);
+      setKotPrinterPort(kotPort);
     };
     load();
   }, []);
@@ -122,6 +136,11 @@ export default function SettingsScreen() {
   const selectPrinterType = async (type: "bluetooth" | "wifi") => {
     setPrinterType(type);
     await store.setPrinterType(type);
+  };
+
+  const selectPaperSize = async (size: PaperSize) => {
+    setPaperSize(size);
+    await store.setPaperSize(size);
   };
 
   // ── BT scan ────────────────────────────────────────────────────
@@ -169,7 +188,7 @@ export default function SettingsScreen() {
     if (!addr) { Alert.alert("No Printer", "Set a Bluetooth printer address first."); return; }
     setTestingBt(true);
     try {
-      await sendTestPageBluetooth(addr);
+      await sendTestPageBluetooth(addr, paperSize);
       Alert.alert("Test Page Sent", "Check your printer.");
     } catch (e: any) {
       Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
@@ -184,12 +203,54 @@ export default function SettingsScreen() {
     if (!ip) { Alert.alert("No Printer", "Set a WiFi printer IP first."); return; }
     setTestingWifi(true);
     try {
-      await sendTestPageWifi(ip, port);
+      await sendTestPageWifi(ip, port, paperSize);
       Alert.alert("Test Page Sent", "Check your printer.");
     } catch (e: any) {
       Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
     } finally {
       setTestingWifi(false);
+    }
+  };
+
+  // ── KOT Printer ────────────────────────────────────────────────
+  const toggleKotPrinter = async (val: boolean) => {
+    setKotPrinterEnabled(val);
+    await store.setKotPrinterEnabled(val);
+  };
+
+  const saveKotPrinter = async () => {
+    const ip = kotPrinterIp.trim();
+    const port = kotPrinterPort.trim() || "9100";
+    if (ip && !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+      Alert.alert("Invalid IP", "Enter a valid IP address (e.g. 192.168.1.200)");
+      return;
+    }
+    await Promise.all([store.setKotPrinterIp(ip), store.setKotPrinterPort(port)]);
+    Alert.alert("Saved", "KOT printer settings saved");
+  };
+
+  const testKotPrinter = async () => {
+    const ip = kotPrinterIp.trim();
+    const port = kotPrinterPort.trim() || "9100";
+    if (!ip) { Alert.alert("No KOT Printer", "Set the KOT printer IP first."); return; }
+    setTestingKot(true);
+    try {
+      const kotEsc = buildKotEsc(paperSize, {
+        shopName: "iDine Lite",
+        orderNo: "001",
+        cashier: "Admin",
+        dateTime: new Date().toLocaleString("en-LK"),
+        items: [
+          { name: "Test Item", portionName: "Full", qty: 2 },
+          { name: "Another Item", qty: 1 },
+        ],
+      });
+      await printWifi(ip, parseInt(port) || 9100, kotEsc);
+      Alert.alert("Test KOT Sent", "Check your kitchen printer.");
+    } catch (e: any) {
+      Alert.alert("KOT Print Failed", e?.message ?? "Could not reach KOT printer.");
+    } finally {
+      setTestingKot(false);
     }
   };
 
@@ -353,6 +414,36 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Paper size selector */}
+          <View style={{ flexDirection: "row", marginTop: 10, gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.printerToggleBtn, { flex: 1 }, paperSize === "58" && styles.printerToggleBtnActive]}
+              onPress={() => selectPaperSize("58")}
+            >
+              <Text style={[styles.printerToggleBtnText, paperSize === "58" && styles.printerToggleBtnTextActive]}>58mm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.printerToggleBtn, { flex: 1 }, paperSize === "80" && styles.printerToggleBtnActiveWifi]}
+              onPress={() => selectPaperSize("80")}
+            >
+              <Text style={[styles.printerToggleBtnText, paperSize === "80" && styles.printerToggleBtnTextActive]}>80mm</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Receipt footer message */}
+          <View style={{ marginTop: 14 }}>
+            <Text style={[styles.cardLabel, { marginBottom: 6 }]}>Receipt Footer Message</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 0 }]}
+              value={receiptFooter}
+              onChangeText={setReceiptFooter}
+              onBlur={() => store.setReceiptFooter(receiptFooter.trim() || "Thank you! Come again")}
+              placeholder="Thank you! Come again"
+              placeholderTextColor="#AAA"
+              maxLength={80}
+            />
+          </View>
+
           {/* Bluetooth config */}
           {printerType === "bluetooth" && (
             <View style={[styles.card, { marginTop: 12 }]}>
@@ -430,6 +521,76 @@ export default function SettingsScreen() {
               </View>
             </View>
           )}
+        </View>
+
+        {/* KOT Printer Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>KOT Printer (Kitchen)</Text>
+          <View style={styles.card}>
+            {/* Toggle row */}
+            <TouchableOpacity
+              style={styles.kotToggleRow}
+              onPress={() => toggleKotPrinter(!kotPrinterEnabled)}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>Separate KOT Printer</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                  Print KOT to a different WiFi printer (kitchen / counter)
+                </Text>
+              </View>
+              <View style={[styles.kotCheckbox, kotPrinterEnabled && styles.kotCheckboxActive]}>
+                {kotPrinterEnabled && <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>✓</Text>}
+              </View>
+            </TouchableOpacity>
+
+            {/* KOT WiFi IP/Port fields — shown only when enabled */}
+            {kotPrinterEnabled && (
+              <View style={{ marginTop: 6, gap: 10 }}>
+                <View style={styles.kotDivider} />
+                <View style={styles.infoRow}>
+                  <CookingPot size={18} color="#E65100" />
+                  <Text style={[styles.cardLabel, { color: "#E65100" }]}>KOT Printer IP</Text>
+                </View>
+                <Text style={styles.helperText}>e.g. 192.168.1.200</Text>
+                <TextInput
+                  style={styles.input}
+                  value={kotPrinterIp}
+                  onChangeText={setKotPrinterIp}
+                  placeholder="192.168.1.200"
+                  placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="numeric"
+                />
+                <Text style={[styles.cardLabel, { marginTop: 2 }]}>Port</Text>
+                <Text style={styles.helperText}>Default: 9100</Text>
+                <TextInput
+                  style={styles.input}
+                  value={kotPrinterPort}
+                  onChangeText={setKotPrinterPort}
+                  placeholder="9100"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="number-pad"
+                />
+                <View style={styles.btnRow}>
+                  <TouchableOpacity style={[styles.saveBtn, { backgroundColor: "#FFE0B2", flex: 1 }]} onPress={saveKotPrinter}>
+                    <Text style={[styles.saveBtnText, { color: "#E65100" }]}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.testBtn, { flex: 1, backgroundColor: "#E65100" }]}
+                    onPress={testKotPrinter}
+                    disabled={testingKot}
+                  >
+                    {testingKot
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <><CookingPot size={15} color="#fff" /><Text style={styles.testBtnText}>Test KOT</Text></>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* App Info */}
@@ -610,6 +771,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: Radius.md,
   },
   cancelText: { color: Colors.textSecondary, fontWeight: "600", fontSize: 14 },
+
+  // ── KOT printer toggle ──
+  kotToggleRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+  },
+  kotCheckbox: {
+    width: 28, height: 28, borderRadius: 6,
+    borderWidth: 2, borderColor: Colors.border,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "#F5F5F5",
+  },
+  kotCheckboxActive: {
+    backgroundColor: "#E65100", borderColor: "#E65100",
+  },
+  kotDivider: {
+    height: 1, backgroundColor: Colors.border, marginVertical: 4,
+  },
 
   // ── Profile card ──
   profileCard: {

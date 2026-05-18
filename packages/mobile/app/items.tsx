@@ -194,8 +194,7 @@ export default function ItemsScreen() {
   const filtered = filterCat === null ? products : products.filter((p) => p.category_id === filterCat);
 
   const openEdit = (p: Product) => {
-    setEditPanel(p);
-    setForm({ name: p.name, price: String(p.price), description: p.description ?? "", categoryId: String(p.category_id ?? "") });
+    router.push(`/add-item?id=${p.id}` as any);
   };
 
   const handleSave = () => {

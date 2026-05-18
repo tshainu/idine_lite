@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   FlatList, Modal, TextInput, Alert, Platform, useWindowDimensions, Image,
-  Animated, Linking, RefreshControl,
+  Animated, RefreshControl,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -14,6 +14,7 @@ import db from "../lib/database";
 import { getSession } from "../lib/auth";
 import { store } from "../lib/store";
 import * as Crypto from "expo-crypto";
+import { printWifi, printBluetooth, buildReceiptEsc, buildKotEsc, type PaperSize } from "../lib/printer";
 
 interface Category { id: number; name: string; }
 interface Product { id: number; name: string; price: number; category_id: number; image_url?: string; description?: string; portions: Portion[]; }
@@ -37,7 +38,8 @@ interface RecentOrder {
 
 // Web demo data
 const DEMO_CATS: Category[] = [
-  { id: -1, name: "Fast Move" }, { id: 1, name: "Sri Lankan" }, { id: 2, name: "Indian" },
+  { id: -2, name: "Popular" }, { id: -3, name: "All Items" },
+  { id: 1, name: "Sri Lankan" }, { id: 2, name: "Indian" },
   { id: 3, name: "Chinees" }, { id: 4, name: "Beverages" },
 ];
 const DEMO_PRODS: Product[] = [
@@ -254,6 +256,11 @@ export default function BillingScreen() {
   const [printerAddr, setPrinterAddr] = useState("");
   const [wifiPrinterIp, setWifiPrinterIp] = useState("");
   const [wifiPrinterPort, setWifiPrinterPort] = useState("9100");
+  const [paperSize, setPaperSize] = useState<PaperSize>("58");
+  const [receiptFooter, setReceiptFooter] = useState("Thank you! Come again");
+  const [kotPrinterEnabled, setKotPrinterEnabled] = useState(false);
+  const [kotPrinterIp, setKotPrinterIp] = useState("");
+  const [kotPrinterPort, setKotPrinterPort] = useState("9100");
 
   // Drawer animation
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -290,7 +297,7 @@ export default function BillingScreen() {
   const [receiptModal, setReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     billNo: number; date: string; time: string;
-    shopName: string; shopAddress: string;
+    shopName: string; shopAddress: string; shopPhone: string;
     cashier: string;
     items: { name: string; qty: number; price: number; amt: number }[];
     subtotal: number; discount: number; total: number; paid: number; balance: number;
@@ -310,11 +317,21 @@ export default function BillingScreen() {
       store.getPrinterAddress(),
       store.getWifiPrinterIp(),
       store.getWifiPrinterPort(),
-    ]).then(([ptype, addr, ip, port]) => {
+      store.getPaperSize(),
+      store.getReceiptFooter(),
+      store.getKotPrinterEnabled(),
+      store.getKotPrinterIp(),
+      store.getKotPrinterPort(),
+    ]).then(([ptype, addr, ip, port, paper, footer, kotEnabled, kotIp, kotPort]) => {
       setPrinterType(ptype);
       setPrinterAddr(addr ?? "");
       setWifiPrinterIp(ip);
       setWifiPrinterPort(port);
+      setPaperSize(paper);
+      setReceiptFooter(footer);
+      setKotPrinterEnabled(kotEnabled);
+      setKotPrinterIp(kotIp);
+      setKotPrinterPort(kotPort);
     });
   }, []);
 
@@ -342,7 +359,7 @@ export default function BillingScreen() {
       const countMap: Record<number, number> = {};
       sold.forEach((r) => { countMap[r.product_id] = r.total; });
       setSoldCounts(countMap);
-      setCategories([{ id: -2, name: "Popular" }, ...cats]);
+      setCategories([{ id: -2, name: "Popular" }, { id: -3, name: "All Items" }, ...cats]);
       setProducts(prodsWithPortions);
     } catch (e) {
       console.warn("DB load failed", e);
@@ -365,10 +382,20 @@ export default function BillingScreen() {
         "SELECT * FROM orders ORDER BY created_at DESC LIMIT 20"
       ) as any[];
       const result: RecentOrder[] = orders.map((o) => {
-        const items = db.getAllSync(
+        const items = (db.getAllSync(
           "SELECT * FROM order_items WHERE order_id = ?", [o.id]
-        ) as any[];
-        return { ...o, items };
+        ) as any[]).map(it => ({
+          ...it,
+          unit_price: parseFloat(it.unit_price) || 0,
+          line_total: parseFloat(it.line_total) || 0,
+          qty: parseInt(it.qty) || 0,
+        }));
+        return {
+          ...o,
+          total: parseFloat(o.total) || 0,
+          discount: parseFloat(o.discount) || 0,
+          items,
+        };
       });
       setRecentOrders(result);
     } catch (e) {
@@ -378,13 +405,17 @@ export default function BillingScreen() {
 
   const filteredProducts = (() => {
     const filtered = products.filter((p) => {
-      const matchCat = selectedCat === -2 || p.category_id === selectedCat;
+      const matchCat = selectedCat === -2 || selectedCat === -3 || p.category_id === selectedCat;
       const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
       return matchCat && matchSearch;
     });
     if (selectedCat === -2) {
       // Sort by most sold, unsold items go last
       return [...filtered].sort((a, b) => (soldCounts[b.id] ?? 0) - (soldCounts[a.id] ?? 0));
+    }
+    if (selectedCat === -3) {
+      // All items alphabetical
+      return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
     }
     return filtered;
   })();
@@ -521,7 +552,8 @@ export default function BillingScreen() {
       date: `${dd}.${mm}.${yyyy}`,
       time: `${hh}:${min}`,
       shopName: session?.shop?.name ?? "iDine Lite",
-      shopAddress: (session?.shop as any)?.address ?? "",
+      shopAddress: (session?.shop as any)?.address || "Chemani road, Nallur, Jaffna",
+      shopPhone: session?.shop?.phone || "0711336666",
       cashier: session?.user?.username ?? "-",
       items: snapCart,
       subtotal: snapSubtotal,
@@ -551,78 +583,102 @@ export default function BillingScreen() {
   const handlePrintReceipt = async (data: typeof receiptData) => {
     if (!data) return;
 
-    // Build ESC/POS string
-    const fmt = (n: number) => n.toLocaleString("en-LK");
-    const line = (l: string, r: string, w = 32) => {
-      const gap = Math.max(1, w - l.length - r.length);
-      return l + " ".repeat(gap) + r + "\n";
-    };
-    let esc =
-      "\x1B\x40" +        // init
-      "\x1B\x61\x01" +    // center
-      "\x1B\x21\x10" +    // double height
-      `${data.shopName}\n` +
-      "\x1B\x21\x00" +    // normal
-      (data.shopAddress ? `${data.shopAddress}\n` : "") +
-      "--------------------------------\n" +
-      "\x1B\x61\x00" +    // left
-      `Bill: ${String(data.billNo).padStart(3,"0")}   ${data.date} ${data.time}\n` +
-      `Cashier: ${data.cashier}\n` +
-      "--------------------------------\n";
-    data.items.forEach(it => {
-      esc += line(`${it.name} x${it.qty}`, `Rs.${fmt(it.amt)}`);
+    const esc = buildReceiptEsc(paperSize, {
+      shopName: data.shopName,
+      shopAddress: data.shopAddress,
+      shopPhone: data.shopPhone,
+      billNo: data.billNo,
+      date: data.date,
+      time: data.time,
+      cashier: data.cashier,
+      items: data.items.map(it => ({ name: it.name, qty: it.qty, amt: it.amt })),
+      subtotal: data.subtotal,
+      discount: data.discount,
+      total: data.total,
+      paid: data.paid,
+      balance: data.balance,
+      receiptFooter,
     });
-    esc +=
-      "--------------------------------\n" +
-      line("Sub Total", `Rs.${fmt(data.subtotal)}`) +
-      (data.discount > 0 ? line("Discount", `-Rs.${fmt(data.discount)}`) : "") +
-      "\x1B\x21\x10" +    // double height
-      line("NET PAY", `Rs.${fmt(data.total)}`) +
-      "\x1B\x21\x00" +    // normal
-      line("Paid", `Rs.${fmt(data.paid)}`) +
-      line("Balance", `Rs.${fmt(data.balance)}`) +
-      "--------------------------------\n" +
-      "\x1B\x61\x01" +    // center
-      "Thank you! Come again\n\n\n" +
-      "\x1D\x56\x00";     // cut
 
     try {
       if (printerType === "wifi") {
-        if (!wifiPrinterIp) {
-          Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings.");
-          return;
-        }
-        const apiUrl = await store.getApiUrl();
-        // encode ESC/POS as base64 so it survives JSON transport
-        const b64 = btoa(unescape(encodeURIComponent(esc)));
-        const res = await fetch(`${apiUrl}/api/print/wifi`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ip: wifiPrinterIp, port: parseInt(wifiPrinterPort || "9100"), data: b64 }),
-        });
-        const json = await res.json() as any;
-        if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
+        if (!wifiPrinterIp) { Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings."); return; }
+        await printWifi(wifiPrinterIp, parseInt(wifiPrinterPort || "9100"), esc);
       } else {
-        if (!printerAddr) {
-          Alert.alert("No Bluetooth Printer", "Set Bluetooth printer address in Settings.");
-          return;
-        }
-        try {
-          const RNBt = require("react-native-bluetooth-classic").default;
-          if (!RNBt || typeof RNBt.connectToDevice !== "function") throw new Error("native");
-          const dev = await RNBt.connectToDevice(printerAddr);
-          await dev.write(esc);
-          await dev.disconnect();
-        } catch (e: any) {
-          if (e?.message === "native") {
-            Alert.alert("Bluetooth Not Available", "Bluetooth printing requires a built APK (not Expo Go).");
-          } else {
-            throw e;
-          }
-          return;
-        }
+        if (!printerAddr) { Alert.alert("No Bluetooth Printer", "Set Bluetooth printer address in Settings."); return; }
+        await printBluetooth(printerAddr, esc);
       }
       Alert.alert("Printed", "Receipt sent to printer.");
+    } catch (e: any) {
+      Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
+    }
+  };
+
+  const handlePrintBillAndKOT = async (data: typeof receiptData) => {
+    if (!data) return;
+
+    // Build Bill ESC
+    const billEsc = buildReceiptEsc(paperSize, {
+      shopName: data.shopName,
+      shopAddress: data.shopAddress,
+      shopPhone: data.shopPhone,
+      billNo: data.billNo,
+      date: data.date,
+      time: data.time,
+      cashier: data.cashier,
+      items: data.items.map(it => ({ name: it.name, qty: it.qty, amt: it.amt })),
+      subtotal: data.subtotal,
+      discount: data.discount,
+      total: data.total,
+      paid: data.paid,
+      balance: data.balance,
+      receiptFooter,
+    });
+
+    // Build KOT ESC from current receipt data items
+    const now2 = new Date();
+    const dd2 = now2.getDate().toString().padStart(2, "0");
+    const mm2 = (now2.getMonth() + 1).toString().padStart(2, "0");
+    const yyyy2 = now2.getFullYear();
+    const hh2 = now2.getHours().toString().padStart(2, "0");
+    const min2 = now2.getMinutes().toString().padStart(2, "0");
+
+    const kotEsc = buildKotEsc(paperSize, {
+      shopName: data.shopName,
+      orderNo: String(data.billNo).padStart(3, "0"),
+      cashier: data.cashier,
+      dateTime: `${dd2}.${mm2}.${yyyy2} ${hh2}:${min2}`,
+      items: data.items.map(it => {
+        // item.name may be "ProductName (PortionName)" — split it back
+        const match = it.name.match(/^(.+?)\s*\((.+)\)$/);
+        return {
+          name: match ? match[1] : it.name,
+          portionName: match ? match[2] : undefined,
+          qty: it.qty,
+        };
+      }),
+    });
+
+    try {
+      // Print Bill on main printer
+      if (printerType === "wifi") {
+        if (!wifiPrinterIp) { Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings."); return; }
+        await printWifi(wifiPrinterIp, parseInt(wifiPrinterPort || "9100"), billEsc);
+      } else {
+        if (!printerAddr) { Alert.alert("No Bluetooth Printer", "Set Bluetooth printer address in Settings."); return; }
+        await printBluetooth(printerAddr, billEsc);
+      }
+
+      // Print KOT — use dedicated KOT printer if enabled, else same main printer
+      if (kotPrinterEnabled && kotPrinterIp) {
+        await printWifi(kotPrinterIp, parseInt(kotPrinterPort || "9100"), kotEsc);
+      } else if (printerType === "wifi") {
+        await printWifi(wifiPrinterIp, parseInt(wifiPrinterPort || "9100"), kotEsc);
+      } else {
+        await printBluetooth(printerAddr, kotEsc);
+      }
+
+      Alert.alert("Printed", "Bill & KOT sent to printer.");
     } catch (e: any) {
       Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
     }
@@ -633,13 +689,42 @@ export default function BillingScreen() {
     setKotModal(true);
   };
 
-  const confirmKOT = () => {
+  const confirmKOT = async () => {
     const orderId = saveOrder("kot");
     setKotModal(false);
     if (orderId !== null) {
+      const now = new Date();
+      const dd = now.getDate().toString().padStart(2, "0");
+      const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+      const yyyy = now.getFullYear();
+      const hh = now.getHours().toString().padStart(2, "0");
+      const min = now.getMinutes().toString().padStart(2, "0");
+
+      const kotEsc = buildKotEsc(paperSize, {
+        shopName: session?.shop?.name ?? "iDine Lite",
+        orderNo: String(billNo).padStart(3, "0"),
+        cashier: session?.user?.username ?? "Admin",
+        dateTime: `${dd}.${mm}.${yyyy} ${hh}:${min}`,
+        items: cart.map(i => ({ name: i.productName, portionName: i.portionName, qty: i.qty })),
+      });
+
+      try {
+        // Use dedicated KOT printer if enabled, otherwise fall back to main printer
+        if (kotPrinterEnabled && kotPrinterIp) {
+          await printWifi(kotPrinterIp, parseInt(kotPrinterPort || "9100"), kotEsc);
+        } else if (printerType === "wifi") {
+          if (wifiPrinterIp) await printWifi(wifiPrinterIp, parseInt(wifiPrinterPort || "9100"), kotEsc);
+          else Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings.");
+        } else {
+          if (printerAddr) await printBluetooth(printerAddr, kotEsc);
+          else Alert.alert("No Bluetooth Printer", "Pair a printer in Settings.");
+        }
+      } catch (e: any) {
+        Alert.alert("KOT Print Failed", e?.message ?? "Could not reach printer.");
+      }
+
       setCart([]);
       setBillNo((prev) => prev + 1);
-      // Print would happen here via Bluetooth printer
     }
   };
 
@@ -754,8 +839,8 @@ export default function BillingScreen() {
         <View style={s.tableHeader}>
           <Text style={[s.th, { width: 22 }]}>No.</Text>
           <Text style={[s.th, { flex: 1 }]}>Item</Text>
-          <Text style={[s.th, { width: 38 }]}>Ptn</Text>
-          <Text style={[s.th, { width: 22, textAlign: "center" }]}>Q</Text>
+          <Text style={[s.th, { width: 32 }]}>Ptn</Text>
+          <Text style={[s.th, { width: 30, textAlign: "center" }]}>Qty</Text>
           <Text style={[s.th, { width: 52, textAlign: "right" }]}>Price</Text>
           <Text style={[s.th, { width: 58, textAlign: "right" }]}>Amt</Text>
         </View>
@@ -768,8 +853,8 @@ export default function BillingScreen() {
             <TouchableOpacity key={idx} style={s.tableRow} onPress={() => updateQty(idx, 1)} onLongPress={() => updateQty(idx, -1)}>
               <Text style={[s.td, { width: 22, fontSize: 11 }]}>{idx + 1}.</Text>
               <Text style={[s.td, { flex: 1 }]} numberOfLines={1}>{item.productName}</Text>
-              <Text style={[s.td, { width: 38, fontSize: 11 }]} numberOfLines={1}>{item.portionName ?? "-"}</Text>
-              <Text style={[s.td, { width: 22, textAlign: "center", fontWeight: "700" }]}>{item.qty}</Text>
+              <Text style={[s.td, { width: 32, fontSize: 11 }]} numberOfLines={1}>{item.portionName ?? "-"}</Text>
+              <Text style={[s.td, { width: 30, textAlign: "center", fontWeight: "700" }]}>{item.qty}</Text>
               <Text style={[s.td, { width: 52, textAlign: "right", fontSize: 11 }]}>{item.unitPrice.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
               <Text style={[s.td, { width: 58, textAlign: "right", fontSize: 11 }]}>{(item.qty * item.unitPrice).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
             </TouchableOpacity>
@@ -1028,6 +1113,12 @@ export default function BillingScreen() {
                 {/* Shop name + address */}
                 <Text style={s.rcShopName}>{receiptData.shopName}</Text>
                 {!!receiptData.shopAddress && <Text style={s.rcShopAddr}>{receiptData.shopAddress}</Text>}
+                {!!receiptData.shopPhone && <Text style={s.rcShopAddr}>{receiptData.shopPhone}</Text>}
+
+                <View style={s.rcDash} />
+
+                {/* ORDER # — big, single line */}
+                <Text style={s.rcOrderNo}>ORDER  #{String(receiptData.billNo).padStart(3, "0")}</Text>
 
                 <View style={s.rcDash} />
 
@@ -1098,7 +1189,7 @@ export default function BillingScreen() {
                 <View style={s.rcDash} />
 
                 <Text style={s.rcThankYou}>🙏  Thank you! Come again</Text>
-                <Text style={s.rcBrand}>ATOM POS by AxisXNOR</Text>
+                <Text style={s.rcBrand}>iDine Lite by AxisXNOR</Text>
 
               </ScrollView>
 
@@ -1107,20 +1198,21 @@ export default function BillingScreen() {
                 <TouchableOpacity style={{ flex: 1, backgroundColor: "#00BCD4", paddingVertical: 16, alignItems: "center" }} onPress={() => setReceiptModal(false)}>
                   <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>＋ New Bill</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{ flex: 1, backgroundColor: "#FF9800", paddingVertical: 16, alignItems: "center" }} onPress={() => handlePrintReceipt(receiptData)}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: "#FF9800", paddingVertical: 16, alignItems: "center" }}
+                  onPress={() => handlePrintReceipt(receiptData)}
+                  onLongPress={() => setPrinterType(t => t === "wifi" ? "bluetooth" : "wifi")}
+                >
                   <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>🖨 {printerType === "wifi" ? "WiFi Print" : "BT Print"}</Text>
+                  <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>hold to switch</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{ flex: 1, backgroundColor: "#25D366", paddingVertical: 16, alignItems: "center" }} onPress={() => {
-                  if (!receiptData) return;
-                  const fmt = (n: number) => n.toLocaleString("en-LK");
-                  let msg = `*${receiptData.shopName}*\nBill: ${String(receiptData.billNo).padStart(3, "0")}  ${receiptData.date} ${receiptData.time}\n\n`;
-                  receiptData.items.forEach((it, i) => { msg += `${i + 1}. ${it.name} x${it.qty} = Rs.${fmt(it.amt)}\n`; });
-                  msg += `\nSub Total: Rs.${fmt(receiptData.subtotal)}`;
-                  if (receiptData.discount > 0) msg += `\nDiscount: -Rs.${fmt(receiptData.discount)}`;
-                  msg += `\n*Net Pay: Rs.${fmt(receiptData.total)}*\nBalance: Rs.${fmt(receiptData.balance)}\n\nThank you! Come again`;
-                  Linking.openURL(`whatsapp://send?text=${encodeURIComponent(msg)}`);
-                }}>
-                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>💬 WhatsApp</Text>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: "#7B1FA2", paddingVertical: 16, alignItems: "center" }}
+                  onPress={() => handlePrintBillAndKOT(receiptData)}
+                  onLongPress={() => setPrinterType(t => t === "wifi" ? "bluetooth" : "wifi")}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>🖨 Bill & KOT</Text>
+                  <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>hold to switch</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -1206,11 +1298,69 @@ export default function BillingScreen() {
                   </View>
                   {/* Reprint buttons */}
                   <View style={s.recentBtnRow}>
-                    <TouchableOpacity style={s.reprintBtn} onPress={() => Alert.alert("Reprint Bill", `Reprinting bill #${order.id}`)}>
+                    <TouchableOpacity style={s.reprintBtn} onPress={async () => {
+                      try {
+                        const now = new Date(order.created_at);
+                        const dd = String(now.getDate()).padStart(2,"0");
+                        const mm = String(now.getMonth()+1).padStart(2,"0");
+                        const yyyy = now.getFullYear();
+                        const hh = String(now.getHours()).padStart(2,"0");
+                        const min = String(now.getMinutes()).padStart(2,"0");
+                        const subtotal = order.total + order.discount;
+                        const esc = buildReceiptEsc(paperSize, {
+                          shopName: session?.shop?.name ?? "iDine Lite",
+                          shopAddress: (session?.shop as any)?.address || "Chemani road, Nallur, Jaffna",
+                          shopPhone: session?.shop?.phone || "0711336666",
+                          billNo: order.id,
+                          date: `${dd}.${mm}.${yyyy}`,
+                          time: `${hh}:${min}`,
+                          cashier: session?.user?.username ?? "-",
+                          items: order.items.map(it => ({ name: it.product_name + (it.portion_name ? ` (${it.portion_name})` : ""), qty: it.qty, amt: it.line_total })),
+                          subtotal,
+                          discount: order.discount,
+                          total: order.total,
+                          paid: order.total,
+                          balance: 0,
+                          receiptFooter,
+                        });
+                        if (printerType === "wifi") {
+                          if (!wifiPrinterIp) { Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings."); return; }
+                          await printWifi(wifiPrinterIp, parseInt(wifiPrinterPort || "9100"), esc);
+                        } else {
+                          if (!printerAddr) { Alert.alert("No Bluetooth Printer", "Set BT printer in Settings."); return; }
+                          await printBluetooth(printerAddr, esc);
+                        }
+                        Alert.alert("Printed", `Bill #${order.id} sent to printer.`);
+                      } catch (e: any) { Alert.alert("Print Failed", e?.message ?? "Could not reach printer."); }
+                    }}>
                       <Printer size={13} color="#fff" />
                       <Text style={s.reprintBtnText}> Reprint Bill</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[s.reprintBtn, { backgroundColor: Colors.orange }]} onPress={() => Alert.alert("Reprint KOT", `Reprinting KOT #${order.id}`)}>
+                    <TouchableOpacity style={[s.reprintBtn, { backgroundColor: Colors.orange }]} onPress={async () => {
+                      try {
+                        const now = new Date(order.created_at);
+                        const dd = String(now.getDate()).padStart(2,"0");
+                        const mm = String(now.getMonth()+1).padStart(2,"0");
+                        const yyyy = now.getFullYear();
+                        const hh = String(now.getHours()).padStart(2,"0");
+                        const min = String(now.getMinutes()).padStart(2,"0");
+                        const esc = buildKotEsc(paperSize, {
+                          shopName: session?.shop?.name ?? "iDine Lite",
+                          orderNo: String(order.id).padStart(3,"0"),
+                          cashier: session?.user?.username ?? "-",
+                          dateTime: `${dd}.${mm}.${yyyy} ${hh}:${min}`,
+                          items: order.items.map(it => ({ name: it.product_name, portionName: it.portion_name, qty: it.qty })),
+                        });
+                        if (printerType === "wifi") {
+                          if (!wifiPrinterIp) { Alert.alert("No WiFi Printer", "Set WiFi printer IP in Settings."); return; }
+                          await printWifi(wifiPrinterIp, parseInt(wifiPrinterPort || "9100"), esc);
+                        } else {
+                          if (!printerAddr) { Alert.alert("No Bluetooth Printer", "Set BT printer in Settings."); return; }
+                          await printBluetooth(printerAddr, esc);
+                        }
+                        Alert.alert("Printed", `KOT #${order.id} sent to printer.`);
+                      } catch (e: any) { Alert.alert("Print Failed", e?.message ?? "Could not reach printer."); }
+                    }}>
                       <CookingPot size={13} color="#fff" />
                       <Text style={s.reprintBtnText}> Reprint KOT</Text>
                     </TouchableOpacity>
@@ -1534,6 +1684,7 @@ const s = StyleSheet.create({
   },
   rcShopName: { fontSize: 21, fontWeight: "900", textAlign: "center", color: "#111", letterSpacing: 0.3, marginBottom: 2 },
   rcShopAddr: { fontSize: 12, textAlign: "center", color: "#666", marginBottom: 2 },
+  rcOrderNo: { fontSize: 28, fontWeight: "900", textAlign: "center", color: "#111", letterSpacing: 2, paddingVertical: 6 },
   rcDash: { borderStyle: "dashed", borderWidth: 1, borderColor: "#DDD", marginVertical: 9 },
   rcInfoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   rcInfoLbl: { fontSize: 12, color: "#555" },

@@ -12,6 +12,7 @@ import { Colors, Spacing, Radius } from "../lib/theme";
 import { getSession } from "../lib/auth";
 import db from "../lib/database";
 import { syncWithServer } from "../lib/sync";
+import { store } from "../lib/store";
 
 interface SalesData {
   today: number;
@@ -91,18 +92,29 @@ function SalesChart({ period, onPeriodChange, refreshKey }: {
         rows = raw.map(r => ({ label: `${r.hr}h`, total: r.total }));
 
       } else if (period === "week") {
-        const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - 6 * 86400000;
+        // Start from Monday of current week
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dayOfWeek = todayMidnight.getDay(); // 0=Sun,1=Mon,...
+        const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const weekStart = todayMidnight.getTime() - diffToMon * 86400000;
         const raw = db.getAllSync(
-          `SELECT CAST(strftime('%w', created_at/1000, 'unixepoch', 'localtime') AS INTEGER) as dow,
-                  strftime('%d', created_at/1000, 'unixepoch', 'localtime') as dd,
+          `SELECT strftime('%Y-%m-%d', created_at/1000, 'unixepoch', 'localtime') as day_str,
+                  CAST(strftime('%w', created_at/1000, 'unixepoch', 'localtime') AS INTEGER) as dow,
                   COALESCE(SUM(total),0) as total
            FROM orders WHERE created_at >= ? AND created_at IS NOT NULL AND status != 'cancelled'
-           GROUP BY strftime('%Y-%m-%d', created_at/1000, 'unixepoch', 'localtime')
-           ORDER BY created_at`,
+           GROUP BY day_str ORDER BY day_str`,
           [weekStart]
-        ) as { dow: number; dd: string; total: number }[];
+        ) as { day_str: string; dow: number; total: number }[];
         const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-        rows = raw.map(r => ({ label: days[r.dow] ?? r.dd, total: r.total }));
+        // Fill all 7 days Mon–Sun with 0 if no data
+        const dayMap: Record<string, number> = {};
+        raw.forEach(r => { dayMap[r.day_str] = r.total; });
+        rows = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(weekStart + i * 86400000);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          const dow = d.getDay();
+          return { label: days[dow], total: dayMap[key] ?? 0 };
+        });
 
       } else if (period === "month") {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -304,9 +316,43 @@ export default function DashboardScreen() {
   const [sales, setSales] = useState<SalesData>({
     today: 0, yesterday: 0, thisWeek: 0, thisMonth: 0, todayCount: 0,
   });
-  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("month");
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("week");
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [printerOnline, setPrinterOnline] = useState<boolean | null>(null); // null = unknown
+
+  // Printer connectivity check
+  const checkPrinter = useCallback(async () => {
+    if (Platform.OS === "web") { setPrinterOnline(true); return; }
+    try {
+      const type = await store.getPrinterType();
+      if (type === "wifi") {
+        const ip = await store.getWifiPrinterIp();
+        const port = await store.getWifiPrinterPort();
+        if (!ip) { setPrinterOnline(false); return; }
+        // Lightweight TCP ping — send empty bytes, just check connection
+        const TcpSocket = require("react-native-tcp-socket");
+        await new Promise<void>((resolve, reject) => {
+          let done = false;
+          const timer = setTimeout(() => { if (!done) { done = true; client.destroy(); reject(); } }, 3000);
+          const client = TcpSocket.createConnection({ host: ip, port: parseInt(port || "9100") }, () => {
+            clearTimeout(timer); done = true; client.destroy(); resolve();
+          });
+          client.on("error", () => { clearTimeout(timer); if (!done) { done = true; reject(); } });
+        });
+        setPrinterOnline(true);
+      } else {
+        const addr = await store.getPrinterAddress();
+        if (!addr) { setPrinterOnline(false); return; }
+        const RNBt = require("react-native-bluetooth-classic").default;
+        if (!RNBt || typeof RNBt.isDeviceConnected !== "function") { setPrinterOnline(false); return; }
+        const connected = await RNBt.isDeviceConnected(addr);
+        setPrinterOnline(connected);
+      }
+    } catch {
+      setPrinterOnline(false);
+    }
+  }, []);
 
   // Drawer
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -386,11 +432,13 @@ export default function DashboardScreen() {
   useFocusEffect(useCallback(() => {
     loadSales();
     setChartRefreshKey(k => k + 1);
+    checkPrinter();
   }, []));
 
   useEffect(() => {
     loadSession();
     loadSales();
+    checkPrinter();
   }, []);
 
   const fmt = (n: number) => n.toLocaleString();
@@ -418,8 +466,18 @@ export default function DashboardScreen() {
         <Text style={s.headerTitle} numberOfLines={1}>
           {session?.shop?.name ? `iDine Lite - ${session.shop.name}` : "iDine Lite"}
         </Text>
-        <TouchableOpacity style={s.headerIcon}>
-          <Image source={require("../assets/icon_home.png")} style={{ width: 28, height: 28 }} resizeMode="contain" />
+        <TouchableOpacity style={s.headerIcon} onPress={checkPrinter}>
+          <View style={{ position: "relative" }}>
+            <Image source={require("../assets/icon_home.png")} style={{ width: 28, height: 28 }} resizeMode="contain" />
+            {printerOnline !== null && (
+              <View style={{
+                position: "absolute", bottom: 0, right: 0,
+                width: 9, height: 9, borderRadius: 5,
+                backgroundColor: printerOnline ? "#4CAF50" : "#F44336",
+                borderWidth: 1.5, borderColor: Colors.primary,
+              }} />
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 

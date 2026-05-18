@@ -14,8 +14,9 @@ export const auth = new Hono()
       return c.json({ error: "shopCode, username and password are required" }, 400);
     }
 
-    const [shop] = await db.select().from(schema.shops).where(eq(schema.shops.code, shopCode));
+    const [shop] = await db.select().from(schema.shops).where(eq(schema.shops.code, shopCode.toUpperCase().trim()));
     if (!shop) return c.json({ error: "Invalid shop code" }, 401);
+    if (!shop.isActive) return c.json({ error: "This shop has been suspended. Please contact support." }, 403);
 
     const [user] = await db
       .select()
@@ -26,6 +27,9 @@ export const auth = new Hono()
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return c.json({ error: "Invalid credentials" }, 401);
+
+    // Update shop last login timestamp
+    await db.update(schema.shops).set({ lastLoginAt: new Date() }).where(eq(schema.shops.id, shop.id));
 
     // Simple token: base64(shopId:userId:timestamp)
     const token = Buffer.from(`${shop.id}:${user.id}:${Date.now()}`).toString("base64");

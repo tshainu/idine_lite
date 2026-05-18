@@ -7,6 +7,13 @@ export const shops = sqliteTable("shops", {
   name: text("name").notNull(),
   address: text("address"),
   phone: text("phone"),
+  ownerName: text("owner_name"),
+  ownerMobile: text("owner_mobile"),
+  businessType: text("business_type"),
+  remarks: text("remarks"),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  suspendReason: text("suspend_reason"),
+  lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

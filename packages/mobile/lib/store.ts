@@ -10,6 +10,11 @@ const KEYS = {
   WIFI_PRINTER_IP: "idine_wifi_printer_ip",
   WIFI_PRINTER_PORT: "idine_wifi_printer_port",
   PRINTER_TYPE: "idine_printer_type",
+  PAPER_SIZE: "idine_paper_size",
+  RECEIPT_FOOTER: "idine_receipt_footer",
+  KOT_PRINTER_ENABLED: "idine_kot_printer_enabled",
+  KOT_PRINTER_IP: "idine_kot_printer_ip",
+  KOT_PRINTER_PORT: "idine_kot_printer_port",
 };
 
 export interface AuthUser {
@@ -86,6 +91,41 @@ export const store = {
   },
   async setPrinterType(type: "bluetooth" | "wifi") {
     return AsyncStorage.setItem(KEYS.PRINTER_TYPE, type);
+  },
+  async getPaperSize(): Promise<"58" | "80"> {
+    const val = await AsyncStorage.getItem(KEYS.PAPER_SIZE);
+    return (val as "58" | "80") ?? "58";
+  },
+  async setPaperSize(size: "58" | "80") {
+    return AsyncStorage.setItem(KEYS.PAPER_SIZE, size);
+  },
+  async getReceiptFooter(): Promise<string> {
+    const val = await AsyncStorage.getItem(KEYS.RECEIPT_FOOTER);
+    return val ?? "Thank you! Come again";
+  },
+  async setReceiptFooter(text: string) {
+    return AsyncStorage.setItem(KEYS.RECEIPT_FOOTER, text);
+  },
+  async getKotPrinterEnabled(): Promise<boolean> {
+    const val = await AsyncStorage.getItem(KEYS.KOT_PRINTER_ENABLED);
+    return val === "true";
+  },
+  async setKotPrinterEnabled(enabled: boolean) {
+    return AsyncStorage.setItem(KEYS.KOT_PRINTER_ENABLED, enabled ? "true" : "false");
+  },
+  async getKotPrinterIp(): Promise<string> {
+    const val = await AsyncStorage.getItem(KEYS.KOT_PRINTER_IP);
+    return val ?? "";
+  },
+  async setKotPrinterIp(ip: string) {
+    return AsyncStorage.setItem(KEYS.KOT_PRINTER_IP, ip);
+  },
+  async getKotPrinterPort(): Promise<string> {
+    const val = await AsyncStorage.getItem(KEYS.KOT_PRINTER_PORT);
+    return val ?? "9100";
+  },
+  async setKotPrinterPort(port: string) {
+    return AsyncStorage.setItem(KEYS.KOT_PRINTER_PORT, port);
   },
   async clearAuth() {
     return AsyncStorage.multiRemove([KEYS.AUTH_TOKEN, KEYS.AUTH_USER, KEYS.AUTH_SHOP]);

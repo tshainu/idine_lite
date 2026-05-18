@@ -96,7 +96,7 @@ export const startSyncEngine = () => {
   if (syncInterval) return;
   syncInterval = setInterval(() => {
     syncWithServer();
-  }, 60000); // every 60 seconds
+  }, 10000); // every 10 seconds
   // Initial sync after 2s
   setTimeout(() => syncWithServer(), 2000);
 };

@@ -8,6 +8,7 @@ import { reports } from "./routes/reports";
 import { sync } from "./routes/sync";
 import { users } from "./routes/users";
 import { print } from "./routes/print";
+import { admin } from "./routes/admin";
 
 const app = new Hono()
   .basePath("api")
@@ -20,7 +21,8 @@ const app = new Hono()
   .route("/reports", reports)
   .route("/sync", sync)
   .route("/users", users)
-  .route("/print", print);
+  .route("/print", print)
+  .route("/admin", admin);
 
 export type AppType = typeof app;
 export default app;

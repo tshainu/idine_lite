@@ -17,7 +17,10 @@
       ]
     },
     "extra": {
-      "apiUrl": "https://j7j5e2adzj0r7hr6tyiah-preview-4200.runable.site"
+      "apiUrl": "https://j7j5e2adzj0r7hr6tyiah-preview-4200.runable.site",
+      "eas": {
+        "projectId": "a55ee6e3-462f-444a-9d96-3d014e8ef319"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.idinelite_r7k2.runable",

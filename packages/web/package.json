@@ -8,6 +8,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
+    "start": "bun server.ts",
     "lint": "eslint .",
     "preview": "bun run build && vite preview",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate",
@@ -16,6 +17,7 @@
     "db:studio": "bun --env-file=../../.env drizzle-kit studio"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.2",
     "@libsql/client": "^0.17.2",
     "@radix-ui/react-slot": "^1.2.4",
     "@runablehq/website-runtime": "^0.10.0",

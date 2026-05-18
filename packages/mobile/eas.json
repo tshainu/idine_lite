@@ -1,6 +1,10 @@
 {
   "build": {
-    "production": {},
+    "production": {
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal"

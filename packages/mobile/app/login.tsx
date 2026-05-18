@@ -66,7 +66,7 @@ export default function LoginScreen() {
               placeholder="Shop id"
               placeholderTextColor="#BDBDBD"
               value={shopCode}
-              onChangeText={setShopCode}
+              onChangeText={v => setShopCode(v.toUpperCase())}
               autoCapitalize="characters"
             />
           </View>

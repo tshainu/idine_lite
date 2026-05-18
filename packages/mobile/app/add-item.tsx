@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  TextInput, Alert, Platform, Image, Modal,
+  TextInput, Alert, Platform, Image, Modal, KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { List, Camera, Upload, CheckSquare, Square, CaretDown } from "phosphor-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Colors } from "../lib/theme";
@@ -40,7 +40,7 @@ const DEMO_PORTIONS: Portion[] = [
 
 // ─── Dropdown Modal ───────────────────────────────────────────
 function DropdownModal({
-  visible, title, items, selectedId, onSelect, onClose,
+  visible, title, items, selectedId, onSelect, onClose, onAdd,
 }: {
   visible: boolean;
   title: string;
@@ -48,18 +48,61 @@ function DropdownModal({
   selectedId: number | null;
   onSelect: (id: number, label: string) => void;
   onClose: () => void;
+  onAdd?: (name: string) => void;
 }) {
+  const [addMode, setAddMode] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const handleAdd = () => {
+    if (newName.trim() && onAdd) {
+      onAdd(newName.trim());
+      setNewName("");
+      setAddMode(false);
+    }
+  };
+
+  const handleClose = () => {
+    setAddMode(false);
+    setNewName("");
+    onClose();
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={onClose} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={handleClose} />
       <View style={dm.sheet}>
-        <Text style={dm.title}>{title}</Text>
-        <ScrollView style={{ maxHeight: 320 }}>
+        <View style={dm.titleRow}>
+          <Text style={dm.title}>{title}</Text>
+          {onAdd && !addMode && (
+            <TouchableOpacity style={dm.addBtn} onPress={() => setAddMode(true)}>
+              <Text style={dm.addBtnTxt}>+ Add New</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {addMode && (
+          <View style={dm.addRow}>
+            <TextInput
+              style={dm.addInput}
+              placeholder={`New ${title.replace("Select ", "")} name`}
+              placeholderTextColor="#AAA"
+              value={newName}
+              onChangeText={setNewName}
+              autoFocus
+            />
+            <TouchableOpacity style={dm.addConfirm} onPress={handleAdd}>
+              <Text style={dm.addConfirmTxt}>Add</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={dm.addCancel} onPress={() => { setAddMode(false); setNewName(""); }}>
+              <Text style={dm.addCancelTxt}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <ScrollView style={{ maxHeight: 280 }}>
           {items.map((item) => (
             <TouchableOpacity
               key={item.id}
               style={[dm.item, selectedId === item.id && dm.itemActive]}
-              onPress={() => { onSelect(item.id, item.label); onClose(); }}
+              onPress={() => { onSelect(item.id, item.label); handleClose(); }}
             >
               <Text style={[dm.itemTxt, selectedId === item.id && dm.itemTxtActive]}>
                 {item.label}
@@ -68,7 +111,7 @@ function DropdownModal({
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <TouchableOpacity style={dm.closeBtn} onPress={onClose}>
+        <TouchableOpacity style={dm.closeBtn} onPress={handleClose}>
           <Text style={dm.closeTxt}>Close</Text>
         </TouchableOpacity>
       </View>
@@ -86,7 +129,31 @@ const dm = StyleSheet.create({
     backgroundColor: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18,
     padding: 20, paddingBottom: 32,
   },
-  title: { fontSize: 16, fontWeight: "700", color: "#333", marginBottom: 14, textAlign: "center" },
+  titleRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  title: { fontSize: 16, fontWeight: "700", color: "#333" },
+  addBtn: {
+    backgroundColor: "#E8F5E9", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+  },
+  addBtnTxt: { fontSize: 13, color: "#2E7D32", fontWeight: "700" },
+  addRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginBottom: 12, backgroundColor: "#F9F9F9",
+    borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#E0E0E0",
+  },
+  addInput: {
+    flex: 1, fontSize: 14, color: "#222", paddingVertical: 4,
+  },
+  addConfirm: {
+    backgroundColor: "#2E7D32", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  addConfirmTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  addCancel: {
+    backgroundColor: "#EEE", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  addCancelTxt: { color: "#666", fontWeight: "700", fontSize: 13 },
   item: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingVertical: 13, paddingHorizontal: 6,
@@ -104,6 +171,8 @@ const dm = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────
 export default function AddItemScreen() {
+  const { id: editId } = useLocalSearchParams<{ id?: string }>();
+  const isEdit = !!editId;
   const [session, setSession] = useState<any>(null);
 
   // Form state
@@ -121,20 +190,59 @@ export default function AddItemScreen() {
 
   const [catDropOpen, setCatDropOpen] = useState(false);
   const [unitDropOpen, setUnitDropOpen] = useState(false);
+  const [portionAddOpen, setPortionAddOpen] = useState(false);
+  const [newPortionName, setNewPortionName] = useState("");
 
   // Portions: checked state + prices
   const [portionPrices, setPortionPrices] = useState<PortionPrice[]>([]);
 
   useEffect(() => { getSession().then(setSession); loadData(); }, []);
 
-  // Auto-select "Regular" portion once portions are loaded
+  // Auto-select "Regular" portion once portions are loaded (add mode only)
   useEffect(() => {
-    if (portions.length === 0) return;
+    if (portions.length === 0 || isEdit) return;
     const regular = portions.find((p) => p.name.toLowerCase() === "regular");
     if (regular && portionPrices.length === 0) {
       setPortionPrices([{ portionId: regular.id, name: regular.name, price: "" }]);
     }
   }, [portions]);
+
+  // Load existing product data when in edit mode
+  useEffect(() => {
+    if (!isEdit || !editId || Platform.OS === "web") return;
+    try {
+      const prod = db.getFirstSync(
+        `SELECT p.*, c.name as category_name, u.name as unit_name
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+         LEFT JOIN units u ON u.id = p.unit_id
+         WHERE p.id = ?`,
+        [parseInt(editId)]
+      ) as any;
+      if (!prod) return;
+      setItemName(prod.name ?? "");
+      setDescription(prod.description ?? "");
+      setImageUri(prod.image_url ?? null);
+      if (prod.category_id) setSelectedCat({ id: prod.category_id, name: prod.category_name ?? "" });
+      if (prod.unit_id) setSelectedUnit({ id: prod.unit_id, name: prod.unit_name ?? "" });
+
+      // Load existing portions for this product
+      const existingPortions = db.getAllSync(
+        "SELECT id, name, price FROM portions WHERE product_id = ? AND deleted_at IS NULL",
+        [parseInt(editId)]
+      ) as { id: number; name: string; price: number }[];
+
+      if (existingPortions.length > 0) {
+        setPortionPrices(existingPortions.map((ep) => ({
+          portionId: ep.id,
+          name: ep.name,
+          price: String(ep.price),
+        })));
+      }
+    } catch (e) {
+      console.error("Load edit data error:", e);
+    }
+  }, [editId, portions]);
 
   const loadData = () => {
     if (Platform.OS === "web") {
@@ -169,10 +277,65 @@ export default function AddItemScreen() {
         `SELECT name, MIN(id) as id FROM portions 
          WHERE deleted_at IS NULL AND product_id = 0 
          GROUP BY name
-         ORDER BY CASE WHEN name = 'Regular' THEN 0 ELSE 1 END, name`
+         ORDER BY MIN(id) ASC`
       ) as Portion[];
       setPortions(ps.length > 0 ? ps : []);
     } catch { setPortions([]); }
+  };
+
+  // ─── Add new category inline ──────────────────────────────
+  const handleAddCategory = (name: string) => {
+    if (Platform.OS === "web") {
+      const newId = Date.now();
+      const newCat = { id: newId, name };
+      setCategories((prev) => [...prev, newCat]);
+      setSelectedCat({ id: newId, name });
+      return;
+    }
+    try {
+      const shopId = Number(session?.shop?.id ?? 1);
+      db.runSync("INSERT INTO categories (shop_id, name, sort_order) VALUES (?, ?, ?)", [shopId, name, 999]);
+      const inserted = db.getFirstSync(
+        "SELECT id FROM categories WHERE name = ? AND shop_id = ? ORDER BY id DESC LIMIT 1", [name, shopId]
+      ) as { id: number } | null;
+      const newId = inserted?.id ?? Date.now();
+      const newCat = { id: newId, name };
+      setCategories((prev) => [...prev, newCat]);
+      setSelectedCat({ id: newId, name });
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not add category");
+    }
+  };
+
+  // ─── Add new portion template inline ─────────────────────
+  const handleAddPortion = (name: string) => {
+    if (Platform.OS === "web") {
+      const newId = Date.now();
+      const newPortion = { id: newId, name };
+      setPortions((prev) => [...prev, newPortion]);
+      setPortionPrices((prev) => [...prev, { portionId: newId, name, price: "" }]);
+      return;
+    }
+    try {
+      // Check if template already exists
+      const existing = db.getFirstSync(
+        "SELECT id FROM portions WHERE product_id = 0 AND name = ? AND deleted_at IS NULL", [name]
+      ) as { id: number } | null;
+      if (existing) {
+        Alert.alert("Exists", `Portion "${name}" already exists`);
+        return;
+      }
+      db.runSync("INSERT INTO portions (product_id, name, price) VALUES (0, ?, 0)", [name]);
+      const inserted = db.getFirstSync(
+        "SELECT id FROM portions WHERE product_id = 0 AND name = ? ORDER BY id DESC LIMIT 1", [name]
+      ) as { id: number } | null;
+      const newId = inserted?.id ?? Date.now();
+      const newPortion = { id: newId, name };
+      setPortions((prev) => [...prev, newPortion]);
+      setPortionPrices((prev) => [...prev, { portionId: newId, name, price: "" }]);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not add portion");
+    }
   };
 
   const isPortionSelected = (portionId: number) =>
@@ -214,60 +377,64 @@ export default function AddItemScreen() {
   };
 
   const handleSave = () => {
-    console.log("handleSave called, name:", itemName, "platform:", Platform.OS);
     if (!itemName.trim()) { Alert.alert("Required", "Item name is required"); return; }
-
     for (const pp of portionPrices) {
       if (!pp.price.trim() || isNaN(parseFloat(pp.price))) {
         Alert.alert("Validation Error", `Enter a valid price for "${pp.name}"`);
         return;
       }
     }
-
     if (Platform.OS === "web") {
-      Alert.alert("Saved!", `Item "${itemName}" added (demo mode).`);
+      Alert.alert("Saved!", `Item "${itemName}" ${isEdit ? "updated" : "added"} (demo mode).`);
       router.back();
       return;
     }
-
     try {
       const ts = Date.now();
-      const shopId = Number(session?.shop?.id ?? 1);
-      console.log("Inserting product, shopId:", shopId, "name:", itemName.trim());
+      const basePrice = portionPrices.length > 0 ? parseFloat(portionPrices[0].price) || 0 : 0;
 
-      const stmt = `INSERT INTO products (shop_id, category_id, unit_id, name, description, image_url, is_available, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)`;
-      const params: any[] = [
-        shopId,
-        selectedCat?.id ?? null,
-        selectedUnit?.id ?? null,
-        itemName.trim(),
-        description.trim() || null,
-        imageUri ?? null,
-        ts,
-      ];
-      console.log("Params:", JSON.stringify(params));
-      db.runSync(stmt, params);
-
-      console.log("Insert done, fetching last product");
-      const prod = db.getFirstSync(
-        "SELECT id FROM products ORDER BY id DESC LIMIT 1"
-      ) as { id: number } | null;
-      console.log("Last product id:", prod?.id);
-
-      if (prod && portionPrices.length > 0) {
+      if (isEdit && editId) {
+        // UPDATE existing product
+        db.runSync(
+          `UPDATE products SET name=?, description=?, image_url=?, category_id=?, unit_id=?, price=?, updated_at=? WHERE id=?`,
+          [itemName.trim(), description.trim() || null, imageUri ?? null,
+           selectedCat?.id ?? null, selectedUnit?.id ?? null, basePrice, ts, parseInt(editId)]
+        );
+        // Delete old portions and re-insert
+        db.runSync("DELETE FROM portions WHERE product_id=?", [parseInt(editId)]);
         for (const pp of portionPrices) {
           db.runSync(
             "INSERT INTO portions (product_id, name, price) VALUES (?, ?, ?)",
-            [prod.id, pp.name, parseFloat(pp.price)]
+            [parseInt(editId), pp.name, parseFloat(pp.price)]
           );
         }
+        Alert.alert("Updated", `"${itemName}" has been updated!`, [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      } else {
+        // INSERT new product
+        const shopId = Number(session?.shop?.id ?? 1);
+        db.runSync(
+          `INSERT INTO products (shop_id, category_id, unit_id, name, description, image_url, price, is_available, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+          [shopId, selectedCat?.id ?? null, selectedUnit?.id ?? null,
+           itemName.trim(), description.trim() || null, imageUri ?? null, basePrice, ts]
+        );
+        const prod = db.getFirstSync(
+          "SELECT id FROM products ORDER BY id DESC LIMIT 1"
+        ) as { id: number } | null;
+        if (prod && portionPrices.length > 0) {
+          for (const pp of portionPrices) {
+            db.runSync(
+              "INSERT INTO portions (product_id, name, price) VALUES (?, ?, ?)",
+              [prod.id, pp.name, parseFloat(pp.price)]
+            );
+          }
+        }
+        Alert.alert("Item Added", `"${itemName}" has been saved!`, [
+          { text: "OK", onPress: () => router.back() },
+        ]);
       }
-
-      Alert.alert("Item Added", `"${itemName}" has been saved!`, [
-        { text: "OK", onPress: () => router.back() },
-      ]);
     } catch (e: any) {
-      console.error("Save error:", e);
       Alert.alert("Save Failed", e?.message ?? String(e));
     }
   };
@@ -296,12 +463,17 @@ export default function AddItemScreen() {
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
       <ScrollView
         style={{ flex: 1, width: "100%" }}
         contentContainerStyle={s.body}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={s.pageTitle}>Add item</Text>
+        <Text style={s.pageTitle}>{isEdit ? "Edit Item" : "Add Item"}</Text>
 
         {/* Item name */}
         <TextInput
@@ -338,9 +510,41 @@ export default function AddItemScreen() {
         </View>
 
         {/* Eligible Portions */}
-        <Text style={s.sectionLabel}>Eligible Portions</Text>
-        {portions.length === 0 ? (
-          <Text style={s.noneText}>No portions added yet. Add from Settings → Portions.</Text>
+        <View style={s.sectionRow}>
+          <Text style={s.sectionLabel}>Eligible Portions</Text>
+          <TouchableOpacity
+            style={s.sectionAddBtn}
+            onPress={() => setPortionAddOpen((v) => !v)}
+          >
+            <Text style={s.sectionAddTxt}>{portionAddOpen ? "✕" : "+"}</Text>
+          </TouchableOpacity>
+        </View>
+        {portionAddOpen && (
+          <View style={s.inlineAddRow}>
+            <TextInput
+              style={s.inlineAddInput}
+              placeholder="New portion name (e.g. Quarter)"
+              placeholderTextColor="#AAA"
+              value={newPortionName}
+              onChangeText={setNewPortionName}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={s.inlineAddConfirm}
+              onPress={() => {
+                if (newPortionName.trim()) {
+                  handleAddPortion(newPortionName.trim());
+                  setNewPortionName("");
+                  setPortionAddOpen(false);
+                }
+              }}
+            >
+              <Text style={s.inlineAddConfirmTxt}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {portions.length === 0 && !portionAddOpen ? (
+          <Text style={s.noneText}>No portions yet. Tap + to add one.</Text>
         ) : (
           <View style={s.portionGrid}>
             {portions.map((portion) => {
@@ -423,13 +627,14 @@ export default function AddItemScreen() {
         {/* Buttons */}
         <View style={s.btnRow}>
           <Pressable style={s.saveBtn} onPress={() => handleSave()}>
-            <Text style={s.saveBtnTxt}>Add item</Text>
+            <Text style={s.saveBtnTxt}>{isEdit ? "Save Changes" : "Add Item"}</Text>
           </Pressable>
           <Pressable style={s.cancelBtn} onPress={() => handleCancel()}>
             <Text style={s.cancelBtnTxt}>Cancel</Text>
           </Pressable>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Category dropdown modal */}
       <DropdownModal
@@ -439,6 +644,7 @@ export default function AddItemScreen() {
         selectedId={selectedCat?.id ?? null}
         onSelect={(id, label) => setSelectedCat({ id, name: label })}
         onClose={() => setCatDropOpen(false)}
+        onAdd={handleAddCategory}
       />
 
       {/* Unit dropdown modal */}
@@ -497,10 +703,31 @@ const s = StyleSheet.create({
   dropArrow: { fontSize: 11, color: "#666" },
 
   // Portions
+  sectionRow: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", marginBottom: 10,
+  },
   sectionLabel: {
     fontSize: 14, fontWeight: "700", color: "#333",
-    marginBottom: 10,
   },
+  sectionAddBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "#2E7D32", alignItems: "center", justifyContent: "center",
+  },
+  sectionAddTxt: { color: "#fff", fontSize: 18, fontWeight: "700", lineHeight: 22 },
+  inlineAddRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginBottom: 12, backgroundColor: "#F9F9F9",
+    borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#E0E0E0",
+  },
+  inlineAddInput: {
+    flex: 1, fontSize: 14, color: "#222", paddingVertical: 4,
+  },
+  inlineAddConfirm: {
+    backgroundColor: "#2E7D32", borderRadius: 6,
+    paddingHorizontal: 14, paddingVertical: 7,
+  },
+  inlineAddConfirmTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
   portionGrid: {
     flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 16,
   },
