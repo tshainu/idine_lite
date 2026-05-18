@@ -2,10 +2,10 @@
 nixPkgs = ["bun"]
 
 [phases.install]
-cmds = ["cd packages/web && bun install"]
+cmds = ["bun install"]
 
 [phases.build]
-cmds = ["cd packages/web && bun run build"]
+cmds = ["bun run build"]
 
 [start]
-cmd = "cd packages/web && bun server.ts"
+cmd = "bun server.ts"
