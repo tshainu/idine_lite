@@ -11,6 +11,7 @@ import { print } from "./src/api/routes/print";
 import { admin } from "./src/api/routes/admin";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { db } from "./src/api/database";
+import { sql } from "drizzle-orm";
 import path from "path";
 import { existsSync, readFileSync } from "fs";
 
@@ -22,8 +23,29 @@ async function runMigrations() {
     await migrate(db, { migrationsFolder: path.join(import.meta.dir, "drizzle") });
     console.log("✓ Migrations applied");
   } catch (e: any) {
-    // Tables already exist on re-deploy — that's fine
     console.warn("Migration warning (likely already applied):", e?.message ?? e);
+  }
+}
+
+// Seed demo data if DB is empty
+async function seedIfEmpty() {
+  try {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM shops`);
+    const count = Number((result.rows[0] as any).count);
+    if (count === 0) {
+      const seedPath = path.join(import.meta.dir, "drizzle", "seed.sql");
+      if (existsSync(seedPath)) {
+        const seedSql = readFileSync(seedPath, "utf-8");
+        // Execute each statement
+        const statements = seedSql.split(";").map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith("--"));
+        for (const stmt of statements) {
+          await db.execute(sql.raw(stmt));
+        }
+        console.log("✓ Demo data seeded");
+      }
+    }
+  } catch (e: any) {
+    console.warn("Seed warning:", e?.message ?? e);
   }
 }
 
@@ -89,10 +111,12 @@ function getContentType(filePath: string): string {
 
 const port = parseInt(process.env.PORT ?? "3000");
 
-runMigrations().then(() => {
-  console.log(`✓ iDine Lite running on port ${port}`);
-  Bun.serve({
-    port,
-    fetch: app.fetch,
+runMigrations()
+  .then(() => seedIfEmpty())
+  .then(() => {
+    console.log(`✓ iDine Lite running on port ${port}`);
+    Bun.serve({
+      port,
+      fetch: app.fetch,
+    });
   });
-});
