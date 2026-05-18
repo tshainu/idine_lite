@@ -33,7 +33,7 @@ export function buildReceiptEsc(
     time: string;
     cashier: string;
     orderType?: "dine-in" | "takeaway";
-    items: { name: string; qty: number; amt: number }[];
+    items: { name: string; qty: number; price?: number; amt: number }[];
     subtotal: number;
     discount: number;
     total: number;
@@ -98,14 +98,15 @@ export function buildReceiptEsc(
 
   // ── Items table header ──
   esc +=
-    lr("#  ITEM", "QTY     AMT", W) +
+    lr("#  ITEM", "QTY  PRICE    AMT", W) +
     div;
 
   // ── Items ──
   data.items.forEach((it, i) => {
     const idx = `${i + 1}`;
     const nameCol = `${idx}  ${it.name}`;
-    const rightCol = `${it.qty}  Rs.${fmt(it.amt)}`;
+    const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
+    const rightCol = `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`;
     esc += lr(nameCol, rightCol, W);
   });
 
@@ -113,7 +114,7 @@ export function buildReceiptEsc(
 
   // ── Totals ──
   esc += lr("Sub Total", `Rs.${fmt(data.subtotal)}`, W);
-  if (data.discount > 0) esc += lr("Discount", `-Rs.${fmt(data.discount)}`, W);
+  if (data.discount > 0) esc += lr("Discount", `- Rs.${fmt(data.discount)}`, W);
 
   // Net Pay — bold/double height
   esc +=
