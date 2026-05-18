@@ -17,5 +17,17 @@ config.resolver.nodeModulesPaths = [
 
 // Allow GIF assets
 config.resolver.assetExts.push("gif");
+config.resolver.assetExts.push("wasm");
+
+// Stub expo-sqlite for web (wasm can't bundle)
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === "web" && moduleName === "expo-sqlite") {
+    return {
+      filePath: path.resolve(projectRoot, "lib/expo-sqlite-mock.js"),
+      type: "sourceFile",
+    };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
 
 module.exports = config;

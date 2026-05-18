@@ -466,6 +466,12 @@ export default function SettingsScreen() {
               <Text style={[styles.printerToggleBtnText, paperSize === "58" && styles.printerToggleBtnTextActive]}>58mm</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={[styles.printerToggleBtn, { flex: 1 }, paperSize === "75" && styles.printerToggleBtnActiveWifi]}
+              onPress={() => selectPaperSize("75")}
+            >
+              <Text style={[styles.printerToggleBtnText, paperSize === "75" && styles.printerToggleBtnTextActive]}>75mm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.printerToggleBtn, { flex: 1 }, paperSize === "80" && styles.printerToggleBtnActiveWifi]}
               onPress={() => selectPaperSize("80")}
             >

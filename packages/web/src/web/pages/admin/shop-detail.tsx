@@ -7,6 +7,7 @@ interface Shop {
   id: number; name: string; code: string; address: string | null; phone: string | null;
   isActive: boolean; suspendReason: string | null;
   ownerName: string | null; ownerMobile: string | null; businessType: string | null; remarks: string | null;
+  createdAt: string;
 }
 interface User { id: number; username: string; role: string; isActive: boolean; createdAt: string; }
 interface Stats { revenue: number; orders: number; }
@@ -261,6 +262,12 @@ export default function ShopDetail() {
                 Code: <span className="font-mono text-gray-600">{shop.code}</span>
                 {shop.address ? ` · ${shop.address}` : ""}
                 {shop.phone ? ` · ${shop.phone}` : ""}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Created{" "}
+                <span className="text-gray-500">
+                  {new Date(shop.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
               </p>
               {!shop.isActive && shop.suspendReason && (
                 <p className="mt-2 text-sm text-red-600 bg-red-100 rounded-lg px-3 py-2">

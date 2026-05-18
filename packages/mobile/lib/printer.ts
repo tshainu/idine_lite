@@ -1,10 +1,12 @@
 import { Platform } from "react-native";
 
-export type PaperSize = "58" | "80";
+export type PaperSize = "58" | "75" | "80";
 
-// Characters per line: 58mm → 32 chars, 80mm → 48 chars
+// Characters per line: 58mm → 32, 75mm → 42, 80mm → 48
 export function getLineWidth(paper: PaperSize): number {
-  return paper === "80" ? 48 : 32;
+  if (paper === "80") return 48;
+  if (paper === "75") return 42;
+  return 32;
 }
 
 const FOOTER = "iDine Lite | Product of AxisXNOR";
@@ -20,16 +22,6 @@ function divider(width: number): string {
 }
 
 // ── Build receipt ESC/POS ─────────────────────────────────────────
-//
-// Font size mapping (ESC ! byte):
-//   0x00 = normal   (~12pt)
-//   0x10 = 2x height (~18pt tall)
-//   0x20 = 2x width  (~18pt wide)
-//   0x30 = 2x width + 2x height (~24pt)
-//
-// 80mm WiFi:  shop name = 0x30 (24pt), address/phone = 0x10 (18pt), center
-// 58mm BT:    shop name = 0x10 (18pt), address/phone = 0x10 (18pt), center
-//
 export function buildReceiptEsc(
   paper: PaperSize,
   data: {
@@ -40,6 +32,7 @@ export function buildReceiptEsc(
     date: string;
     time: string;
     cashier: string;
+    orderType?: "dine-in" | "takeaway";
     items: { name: string; qty: number; amt: number }[];
     subtotal: number;
     discount: number;
@@ -52,83 +45,91 @@ export function buildReceiptEsc(
   const W = getLineWidth(paper);
   const fmt = (n: number) => n.toLocaleString("en-LK");
   const div = divider(W);
+  const is80 = paper === "80" || paper === "75";
 
   let esc =
     "\x1B\x40" +          // init printer
-    "\x1B\x61\x01";       // center align
+    "\x1B\x61\x01";       // center
 
-  if (paper === "80") {
-    // ── 80mm: shop name 24pt (double width+height), address/phone 18pt (double height)
+  // ── Shop name & contact ──
+  if (is80) {
     esc +=
-      "\x1B\x21\x30" +    // 24pt: double width + double height
+      "\x1B\x21\x30" +    // double width + double height
       `${data.shopName}\n` +
-      "\x1B\x21\x10";     // 18pt: double height only
-    if (data.shopAddress) esc += `${data.shopAddress}\n`;
-    if (data.shopPhone)   esc += `${data.shopPhone}\n`;
-    esc += "\x1B\x21\x00"; // back to normal
+      "\x1B\x21\x00";
   } else {
-    // ── 58mm: shop name 18pt (double height), address/phone 18pt (double height)
     esc +=
-      "\x1B\x21\x10" +    // 18pt: double height
-      `${data.shopName}\n`;
-    if (data.shopAddress) esc += `${data.shopAddress}\n`;
-    if (data.shopPhone)   esc += `${data.shopPhone}\n`;
-    esc += "\x1B\x21\x00"; // back to normal
+      "\x1B\x21\x10" +    // double height only
+      `${data.shopName}\n` +
+      "\x1B\x21\x00";
   }
+  if (data.shopAddress) esc += `${data.shopAddress}\n`;
+  if (data.shopPhone)   esc += `${data.shopPhone}\n`;
 
   esc += div;
 
-  // Bill number — big font on 80mm, 18pt on 58mm
-  if (paper === "80") {
+  // ── ORDER # — matches receipt view exactly ──
+  if (is80) {
     esc +=
-      "\x1B\x61\x01" +      // center
-      "\x1B\x21\x30" +      // 24pt: double width + double height
-      `BILL # ${String(data.billNo).padStart(3, "0")}\n` +
-      "\x1B\x21\x00";       // normal
+      "\x1B\x21\x30" +    // double width + double height
+      `ORDER  #${String(data.billNo).padStart(3, "0")}\n` +
+      "\x1B\x21\x00";
   } else {
     esc +=
-      "\x1B\x61\x01" +      // center
-      "\x1B\x21\x10" +      // 18pt: double height only (safe for 58mm)
-      `BILL # ${String(data.billNo).padStart(3, "0")}\n` +
-      "\x1B\x21\x00";       // normal
+      "\x1B\x21\x10" +    // double height only
+      `ORDER  #${String(data.billNo).padStart(3, "0")}\n` +
+      "\x1B\x21\x00";
   }
 
-  // Bill info — left aligned, normal size
+  // ── Order type line (below ORDER #, smaller) ──
+  const orderTypeLabel = data.orderType === "takeaway" ? "TAKE AWAY" : "DINE IN";
+  esc += `${orderTypeLabel}\n`;
+
+  esc += div;
+
+  // ── Bill info ──
   esc +=
     "\x1B\x61\x00" +      // left align
-    `${data.date} ${data.time}\n` +
-    `Cashier: ${data.cashier}\n` +
+    `Bill No: ${String(data.billNo).padStart(3, "0")}` +
+    " ".repeat(Math.max(1, W - `Bill No: ${String(data.billNo).padStart(3, "0")}`.length - `${data.date}  ${data.time}`.length)) +
+    `${data.date}  ${data.time}\n` +
+    `Payment: Cash\n` +
     div;
 
-  // Items
-  data.items.forEach(it => {
-    esc += lr(`${it.name} x${it.qty}`, `Rs.${fmt(it.amt)}`, W);
+  // ── Items table header ──
+  esc +=
+    lr("#  ITEM", "QTY     AMT", W) +
+    div;
+
+  // ── Items ──
+  data.items.forEach((it, i) => {
+    const idx = `${i + 1}`;
+    const nameCol = `${idx}  ${it.name}`;
+    const rightCol = `${it.qty}  Rs.${fmt(it.amt)}`;
+    esc += lr(nameCol, rightCol, W);
   });
 
   esc += div;
+
+  // ── Totals ──
   esc += lr("Sub Total", `Rs.${fmt(data.subtotal)}`, W);
   if (data.discount > 0) esc += lr("Discount", `-Rs.${fmt(data.discount)}`, W);
 
-  // NET PAY — double height on 58mm, double width+height on 80mm
-  if (paper === "80") {
-    esc +=
-      "\x1B\x21\x10" +    // 18pt: double height only
-      lr("NET PAY", `Rs.${fmt(data.total)}`, W) +
-      "\x1B\x21\x00";
-  } else {
-    esc +=
-      "\x1B\x21\x10" +    // 18pt
-      lr("NET PAY", `Rs.${fmt(data.total)}`, W) +
-      "\x1B\x21\x00";
-  }
+  // Net Pay — bold/double height
+  esc +=
+    "\x1B\x21\x10" +
+    lr("Net Pay", `Rs.${fmt(data.total)}`, W) +
+    "\x1B\x21\x00";
 
-  esc += lr("Paid", `Rs.${fmt(data.paid)}`, W);
+  esc += div;
+  esc += lr("Payment Method", "Cash", W);
+  esc += lr("Total Paid", `Rs.${fmt(data.paid)}`, W);
   esc += lr("Balance", `Rs.${fmt(data.balance)}`, W);
   esc += div;
 
-  // Footer — centered
+  // ── Footer ──
   const footerMsg = data.receiptFooter?.trim() || "Thank you! Come again";
-  const feedLines = paper === "58" ? "\n\n\n\n" : "\n\n\n\n\n\n\n";
+  const feedLines = is80 ? "\n\n\n\n\n\n\n" : "\n\n\n\n";
   esc +=
     "\x1B\x61\x01" +      // center
     `${footerMsg}\n` +

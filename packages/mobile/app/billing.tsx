@@ -33,6 +33,7 @@ interface RecentOrder {
   total: number;
   discount: number;
   status: string;
+  order_type?: "dine-in" | "takeaway";
   items: { product_name: string; portion_name?: string; qty: number; unit_price: number; line_total: number; }[];
 }
 
@@ -295,10 +296,11 @@ export default function BillingScreen() {
   const [kotModal, setKotModal] = useState(false);
   const [recentModal, setRecentModal] = useState(false);
   const [receiptModal, setReceiptModal] = useState(false);
+  const [orderType, setOrderType] = useState<"dine-in" | "takeaway">("dine-in");
   const [receiptData, setReceiptData] = useState<{
     billNo: number; date: string; time: string;
     shopName: string; shopAddress: string; shopPhone: string;
-    cashier: string;
+    cashier: string; orderType: "dine-in" | "takeaway";
     items: { name: string; qty: number; price: number; amt: number }[];
     subtotal: number; discount: number; total: number; paid: number; balance: number;
   } | null>(null);
@@ -511,9 +513,9 @@ export default function BillingScreen() {
     const localId = Crypto.randomUUID();
     const ts = Date.now();
     db.runSync(
-      `INSERT INTO orders (local_id, shop_id, user_id, status, subtotal, discount, total, payment_method, kot_printed, synced, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-      [localId, session?.shop?.id ?? 1, session?.user?.id ?? 1, status, subtotal, discount, total, "cash", status === "kot" ? 1 : 0, ts, ts]
+      `INSERT INTO orders (local_id, shop_id, user_id, status, subtotal, discount, total, payment_method, order_type, kot_printed, synced, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      [localId, session?.shop?.id ?? 1, session?.user?.id ?? 1, status, subtotal, discount, total, "cash", orderType, status === "kot" ? 1 : 0, ts, ts]
     );
     const orderId = (db.getFirstSync("SELECT last_insert_rowid() as id") as any)?.id;
     for (const item of cart) {
@@ -555,6 +557,7 @@ export default function BillingScreen() {
       shopAddress: (session?.shop as any)?.address || "Chemani road, Nallur, Jaffna",
       shopPhone: session?.shop?.phone || "0711336666",
       cashier: session?.user?.username ?? "-",
+      orderType,
       items: snapCart,
       subtotal: snapSubtotal,
       discount: snapDiscount,
@@ -572,6 +575,7 @@ export default function BillingScreen() {
     setCashModal(false);
     setCart([]); setDiscount(0); setCollected("");
     setBillNo((prev) => prev + 1);
+    setOrderType("dine-in");
 
     // Show receipt after modal transition settles
     setTimeout(() => {
@@ -591,6 +595,7 @@ export default function BillingScreen() {
       date: data.date,
       time: data.time,
       cashier: data.cashier,
+      orderType: data.orderType,
       items: data.items.map(it => ({ name: it.name, qty: it.qty, amt: it.amt })),
       subtotal: data.subtotal,
       discount: data.discount,
@@ -626,6 +631,7 @@ export default function BillingScreen() {
       date: data.date,
       time: data.time,
       cashier: data.cashier,
+      orderType: data.orderType,
       items: data.items.map(it => ({ name: it.name, qty: it.qty, amt: it.amt })),
       subtotal: data.subtotal,
       discount: data.discount,
@@ -1051,8 +1057,8 @@ export default function BillingScreen() {
               return (
                 <Text style={s.pbBalLine}>
                   Balance :{" "}
-                  <Text style={[s.pbBalAmt, { color: bal >= 0 ? Colors.green : "#C0392B" }]}>
-                    {bal >= 0 ? `+ ${bal.toLocaleString("en-LK")}` : `- ${Math.abs(bal).toLocaleString("en-LK")}`}
+                  <Text style={[s.pbBalAmt, { color: "#2E7D32" }]}>
+                    Rs.{Math.abs(bal).toLocaleString("en-LK")}
                   </Text>
                 </Text>
               );
@@ -1060,6 +1066,32 @@ export default function BillingScreen() {
 
             {/* NumPad — layout: 1 2 3 / 4 5 6 / 7 8 9 / < 0 . */}
             <NumPadCash value={collected} onChange={setCollected} />
+
+            {/* Order Type toggle */}
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14, marginBottom: 2 }}>
+              <TouchableOpacity
+                onPress={() => setOrderType("dine-in")}
+                style={{
+                  flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: "center",
+                  backgroundColor: orderType === "dine-in" ? "#4CAF50" : "#F0F0F0",
+                  borderWidth: 1.5,
+                  borderColor: orderType === "dine-in" ? "#388E3C" : "#DCDCDC",
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "700", color: orderType === "dine-in" ? "#fff" : "#555" }}>🍽  Dine In</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setOrderType("takeaway")}
+                style={{
+                  flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: "center",
+                  backgroundColor: orderType === "takeaway" ? "#FF9800" : "#F0F0F0",
+                  borderWidth: 1.5,
+                  borderColor: orderType === "takeaway" ? "#F57C00" : "#DCDCDC",
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "700", color: orderType === "takeaway" ? "#fff" : "#555" }}>🥡  Take Away</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Buttons */}
             <View style={s.pbBtnRow}>
@@ -1119,6 +1151,9 @@ export default function BillingScreen() {
 
                 {/* ORDER # — big, single line */}
                 <Text style={s.rcOrderNo}>ORDER  #{String(receiptData.billNo).padStart(3, "0")}</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", textAlign: "center", color: "#444", letterSpacing: 1, marginTop: -2, marginBottom: 4 }}>
+                  {receiptData.orderType === "takeaway" ? "🥡  TAKE AWAY" : "🍽  DINE IN"}
+                </Text>
 
                 <View style={s.rcDash} />
 
@@ -1315,6 +1350,7 @@ export default function BillingScreen() {
                           date: `${dd}.${mm}.${yyyy}`,
                           time: `${hh}:${min}`,
                           cashier: session?.user?.username ?? "-",
+                          orderType: order.order_type ?? "dine-in",
                           items: order.items.map(it => ({ name: it.product_name + (it.portion_name ? ` (${it.portion_name})` : ""), qty: it.qty, amt: it.line_total })),
                           subtotal,
                           discount: order.discount,
@@ -1614,7 +1650,7 @@ const s = StyleSheet.create({
     alignItems: "center", marginBottom: 6,
   },
   pbAmtTxt: { fontSize: 28, fontWeight: "800", color: "#111" },
-  pbBalLine: { fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 8 },
+  pbBalLine: { fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 8, color: "#111" },
   pbBalAmt: { fontWeight: "800" },
   pbBtnRow: { flexDirection: "row", gap: 10, marginTop: 14 },
   pbBtn: {

@@ -266,6 +266,9 @@ export default function AdminShops() {
                         {shop.businessType ? ` · ${shop.businessType}` : ""}
                         {shop.phone ? ` · ${shop.phone}` : ""}
                       </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Added {new Date(shop.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
                     </div>
                   </div>
                 </div>
