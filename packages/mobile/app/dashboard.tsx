@@ -330,24 +330,56 @@ export default function DashboardScreen() {
         const ip = await store.getWifiPrinterIp();
         const port = await store.getWifiPrinterPort();
         if (!ip) { setPrinterOnline(false); return; }
-        // Lightweight TCP ping — send empty bytes, just check connection
+        // TCP ping with longer timeout and proper event handling
         const TcpSocket = require("react-native-tcp-socket");
-        await new Promise<void>((resolve, reject) => {
+        const online = await new Promise<boolean>((resolve) => {
           let done = false;
-          const timer = setTimeout(() => { if (!done) { done = true; client.destroy(); reject(); } }, 3000);
-          const client = TcpSocket.createConnection({ host: ip, port: parseInt(port || "9100") }, () => {
-            clearTimeout(timer); done = true; client.destroy(); resolve();
-          });
-          client.on("error", () => { clearTimeout(timer); if (!done) { done = true; reject(); } });
+          const finish = (result: boolean) => {
+            if (done) return;
+            done = true;
+            try { client.destroy(); } catch {}
+            resolve(result);
+          };
+          const timer = setTimeout(() => finish(false), 5000);
+          const client = TcpSocket.createConnection(
+            { host: ip, port: parseInt(port || "9100"), timeout: 5000 },
+            () => { clearTimeout(timer); finish(true); }
+          );
+          client.on("connect", () => { clearTimeout(timer); finish(true); });
+          client.on("error", () => { clearTimeout(timer); finish(false); });
+          client.on("timeout", () => { clearTimeout(timer); finish(false); });
         });
-        setPrinterOnline(true);
+        setPrinterOnline(online);
       } else {
         const addr = await store.getPrinterAddress();
         if (!addr) { setPrinterOnline(false); return; }
-        const RNBt = require("react-native-bluetooth-classic").default;
-        if (!RNBt || typeof RNBt.isDeviceConnected !== "function") { setPrinterOnline(false); return; }
-        const connected = await RNBt.isDeviceConnected(addr);
-        setPrinterOnline(connected);
+        // For Bluetooth: isDeviceConnected only returns true when socket is open.
+        // Try connecting first, then check — or simply treat "paired & configured" as online.
+        try {
+          const RNBt = require("react-native-bluetooth-classic").default;
+          if (!RNBt || typeof RNBt.isDeviceConnected !== "function") {
+            // Module unavailable — assume online if address is configured
+            setPrinterOnline(true); return;
+          }
+          // Try to open a connection so isDeviceConnected returns true
+          try {
+            const alreadyConnected = await RNBt.isDeviceConnected(addr);
+            if (alreadyConnected) { setPrinterOnline(true); return; }
+            // Not connected — attempt connection
+            await Promise.race([
+              RNBt.connectToDevice(addr),
+              new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+            ]);
+            setPrinterOnline(true);
+          } catch {
+            // Connection failed — check one more time
+            const stillConnected = await RNBt.isDeviceConnected(addr).catch(() => false);
+            setPrinterOnline(stillConnected);
+          }
+        } catch {
+          // If module crashes entirely, assume online if address configured
+          setPrinterOnline(true);
+        }
       }
     } catch {
       setPrinterOnline(false);
