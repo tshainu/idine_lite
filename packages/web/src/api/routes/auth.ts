@@ -36,7 +36,7 @@ export const auth = new Hono()
 
     return c.json({
       token,
-      user: { id: user.id, username: user.username, role: user.role },
+      user: { id: user.id, username: user.username, role: user.role, mustChangePassword: user.mustChangePassword },
       shop: { id: shop.id, name: shop.name, code: shop.code },
     }, 200);
   })
@@ -72,7 +72,7 @@ export const auth = new Hono()
 
     if (!token) return c.json({ error: "Unauthorized" }, 401);
     if (!currentPassword || !newPassword) return c.json({ error: "currentPassword and newPassword are required" }, 400);
-    if (newPassword.length < 4) return c.json({ error: "New password must be at least 4 characters" }, 400);
+    if (newPassword.length < 6) return c.json({ error: "New password must be at least 6 characters" }, 400);
 
     // Decode token: base64(shopId:userId:timestamp)
     let userId: number;
@@ -86,11 +86,14 @@ export const auth = new Hono()
     const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
     if (!user) return c.json({ error: "User not found" }, 404);
 
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) return c.json({ error: "Current password is incorrect" }, 401);
+    // If mustChangePassword is set, skip current password check
+    if (!user.mustChangePassword) {
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!valid) return c.json({ error: "Current password is incorrect" }, 401);
+    }
 
     const hash = await bcrypt.hash(newPassword, 10);
-    await db.update(schema.users).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(schema.users.id, userId));
+    await db.update(schema.users).set({ passwordHash: hash, mustChangePassword: false, updatedAt: new Date() }).where(eq(schema.users.id, userId));
 
     return c.json({ success: true }, 200);
   });

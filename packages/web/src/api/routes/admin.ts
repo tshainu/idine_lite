@@ -142,7 +142,7 @@ export const admin = new Hono()
   })
 
   .post("/shops", requireAdmin, async (c) => {
-    const { name, code, address, phone, ownerName, ownerMobile, businessType, remarks, adminUsername, adminPassword } = await c.req.json();
+    const { name, code, address, phone, ownerName, ownerMobile, businessType, remarks, adminUsername } = await c.req.json();
     if (!name || !code) return c.json({ error: "name and code required" }, 400);
 
     const existing = await db.select().from(schema.shops).where(eq(schema.shops.code, code));
@@ -150,18 +150,22 @@ export const admin = new Hono()
 
     const [shop] = await db.insert(schema.shops).values({ name, code, address, phone, ownerName, ownerMobile, businessType, remarks }).returning();
 
-    // Optionally create admin user
-    if (adminUsername && adminPassword) {
-      const hash = await bcrypt.hash(adminPassword, 10);
-      await db.insert(schema.users).values({
-        shopId: shop.id,
-        username: adminUsername,
-        passwordHash: hash,
-        role: "admin",
-      });
-    }
+    // Generate password: first 5 chars of a random flower name + 3 random digits
+    const flowers = ["jasmine","rose","lily","tulip","daisy","lotus","iris","poppy","orchid","violet","peony","aster"];
+    const flower = flowers[Math.floor(Math.random() * flowers.length)];
+    const generatedPassword = flower.slice(0, 5) + String(Math.floor(100 + Math.random() * 900));
 
-    return c.json({ shop }, 201);
+    const username = adminUsername || "admin";
+    const hash = await bcrypt.hash(generatedPassword, 10);
+    await db.insert(schema.users).values({
+      shopId: shop.id,
+      username,
+      passwordHash: hash,
+      role: "admin",
+      mustChangePassword: true,
+    });
+
+    return c.json({ shop, credentials: { username, password: generatedPassword } }, 201);
   })
 
   .get("/shops/:id", requireAdmin, async (c) => {

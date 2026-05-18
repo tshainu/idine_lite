@@ -279,8 +279,8 @@ export default function SettingsScreen() {
       Alert.alert("Error", "New passwords do not match");
       return;
     }
-    if (newPw.length < 4) {
-      Alert.alert("Error", "New password must be at least 4 characters");
+    if (newPw.length < 6) {
+      Alert.alert("Error", "New password must be at least 6 characters");
       return;
     }
     setChangingPw(true);

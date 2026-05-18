@@ -26,9 +26,13 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await loginUser(shopCode.trim(), username.trim(), password);
+      const data = await loginUser(shopCode.trim(), username.trim(), password);
       startSyncEngine();
-      router.replace("/dashboard");
+      if (data.user?.mustChangePassword) {
+        router.replace("/change-password");
+      } else {
+        router.replace("/dashboard");
+      }
     } catch (e: any) {
       Alert.alert("Login Failed", e.message ?? "Invalid credentials");
     } finally {
