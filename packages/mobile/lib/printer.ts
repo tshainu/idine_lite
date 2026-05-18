@@ -52,38 +52,28 @@ export function buildReceiptEsc(
     "\x1B\x61\x01";       // center
 
   // ── Shop name & contact ──
-  if (is80) {
-    esc +=
-      "\x1B\x21\x30" +    // double width + double height
-      `${data.shopName}\n` +
-      "\x1B\x21\x00";
-  } else {
-    esc +=
-      "\x1B\x21\x10" +    // double height only
-      `${data.shopName}\n` +
-      "\x1B\x21\x00";
-  }
+  // Shop name — always double width + double height
+  esc +=
+    "\x1B\x21\x30" +    // double width + double height
+    `${data.shopName}\n` +
+    "\x1B\x21\x00";
   if (data.shopAddress) esc += `${data.shopAddress}\n`;
   if (data.shopPhone)   esc += `${data.shopPhone}\n`;
 
   esc += div;
 
-  // ── ORDER # — matches receipt view exactly ──
-  if (is80) {
-    esc +=
-      "\x1B\x21\x30" +    // double width + double height
-      `ORDER  #${String(data.billNo).padStart(3, "0")}\n` +
-      "\x1B\x21\x00";
-  } else {
-    esc +=
-      "\x1B\x21\x10" +    // double height only
-      `ORDER  #${String(data.billNo).padStart(3, "0")}\n` +
-      "\x1B\x21\x00";
-  }
+  // ── ORDER # — always double width + double height ──
+  esc +=
+    "\x1B\x21\x30" +    // double width + double height
+    `ORDER  #${String(data.billNo).padStart(3, "0")}\n` +
+    "\x1B\x21\x00";
 
-  // ── Order type line (below ORDER #, smaller) ──
+  // ── Order type line ──
   const orderTypeLabel = data.orderType === "takeaway" ? "TAKE AWAY" : "DINE IN";
-  esc += `${orderTypeLabel}\n`;
+  esc +=
+    "\x1B\x21\x10" +    // double height
+    `${orderTypeLabel}\n` +
+    "\x1B\x21\x00";
 
   esc += div;
 
@@ -118,7 +108,7 @@ export function buildReceiptEsc(
 
   // Net Pay — bold/double height
   esc +=
-    "\x1B\x21\x10" +
+    "\x1B\x21\x30" +
     lr("Net Pay", `Rs.${fmt(data.total)}`, W) +
     "\x1B\x21\x00";
 
@@ -181,11 +171,13 @@ export function buildKotEsc(
     orderNo: string;
     cashier: string;
     dateTime: string;
+    orderType?: "dine-in" | "takeaway";
     items: { name: string; portionName?: string; qty: number }[];
   }
 ): string {
   const W = getLineWidth(paper);
   const div = divider(W);
+  const is80 = paper === "80" || paper === "75";
 
   let esc =
     "\x1B\x40" +              // init
@@ -193,22 +185,20 @@ export function buildKotEsc(
     "\x1B\x21\x00" +          // normal
     `${data.shopName}\n`;
 
-  // KOT + ORDER# — double width+height on 80mm, double height only on 58mm
-  if (paper === "80") {
-    esc +=
-      "\x1B\x21\x30" +          // 24pt: double width + double height
-      "KOT\n" +
-      `ORDER # ${data.orderNo}\n` +
-      "\x1B\x21\x00" +          // normal
-      "\x1B\x61\x00";           // left
-  } else {
-    esc +=
-      "\x1B\x21\x10" +          // 18pt: double height only (safe for 58mm)
-      "KOT\n" +
-      `ORDER # ${data.orderNo}\n` +
-      "\x1B\x21\x00" +          // normal
-      "\x1B\x61\x00";           // left
-  }
+  // KOT + ORDER# — double width+height always
+  esc +=
+    "\x1B\x21\x30" +          // double width + double height
+    "KOT\n" +
+    `ORDER # ${data.orderNo}\n` +
+    "\x1B\x21\x00";           // normal
+
+  // Order type label
+  const orderTypeLabel = data.orderType === "takeaway" ? "TAKE AWAY" : "DINE IN";
+  esc +=
+    "\x1B\x21\x10" +          // double height
+    `${orderTypeLabel}\n` +
+    "\x1B\x21\x00" +          // normal
+    "\x1B\x61\x00";           // left
 
   // "Order BY: Admin   17.05.2026 18:30"
   const byLabel = `Order BY: ${data.cashier}`;

@@ -654,6 +654,7 @@ export default function BillingScreen() {
       orderNo: String(data.billNo).padStart(3, "0"),
       cashier: data.cashier,
       dateTime: `${dd2}.${mm2}.${yyyy2} ${hh2}:${min2}`,
+      orderType: data.orderType,
       items: data.items.map(it => {
         // item.name may be "ProductName (PortionName)" — split it back
         const match = it.name.match(/^(.+?)\s*\((.+)\)$/);
@@ -711,6 +712,7 @@ export default function BillingScreen() {
         orderNo: String(billNo).padStart(3, "0"),
         cashier: session?.user?.username ?? "Admin",
         dateTime: `${dd}.${mm}.${yyyy} ${hh}:${min}`,
+        orderType,
         items: cart.map(i => ({ name: i.productName, portionName: i.portionName, qty: i.qty })),
       });
 
