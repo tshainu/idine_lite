@@ -929,7 +929,7 @@ export default function BillingScreen() {
         <View style={s.overlay}>
           <View style={s.modalCard}>
             {/* Red title */}
-            <Text style={s.modalRedTitle}>Select Posion</Text>
+            <Text style={s.modalRedTitle}>Select Portion</Text>
             {/* Item image */}
             <View style={s.modalImgWrap}>
               {portionModal?.image_url
@@ -949,14 +949,34 @@ export default function BillingScreen() {
                     <Text style={s.portionPickName}>{p.name}</Text>
                     <Text style={s.portionPickPrice}>LKR.{p.price.toFixed(2)}</Text>
                   </View>
-                  <View style={s.qtyRow}>
-                    <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, -1)}>
-                      <Text style={s.qtyBtnText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={s.qtyNum}>{portionQtys[p.id] ?? 0}</Text>
-                    <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, 1)}>
-                      <Text style={s.qtyBtnText}>+</Text>
-                    </TouchableOpacity>
+                  <View style={{ alignItems: "flex-end", gap: 6 }}>
+                    {/* Quick qty buttons */}
+                    <View style={{ flexDirection: "row", gap: 4 }}>
+                      {[1, 2, 3, 5, 10].map((q) => (
+                        <TouchableOpacity key={q} style={s.quickQtyBtn} onPress={() => setPortionQtys((prev) => ({ ...prev, [p.id]: q }))}>
+                          <Text style={s.quickQtyText}>{q}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    {/* +/- with editable qty */}
+                    <View style={s.qtyRow}>
+                      <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, -1)}>
+                        <Text style={s.qtyBtnText}>−</Text>
+                      </TouchableOpacity>
+                      <TextInput
+                        style={s.qtyNumInput}
+                        keyboardType="number-pad"
+                        value={String(portionQtys[p.id] ?? 0)}
+                        onChangeText={(v) => {
+                          const n = parseInt(v, 10);
+                          setPortionQtys((prev) => ({ ...prev, [p.id]: isNaN(n) ? 0 : Math.max(0, n) }));
+                        }}
+                        selectTextOnFocus
+                      />
+                      <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, 1)}>
+                        <Text style={s.qtyBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               )),
@@ -1604,6 +1624,17 @@ const s = StyleSheet.create({
   },
   qtyBtnText: { fontSize: 22, fontWeight: "700", color: Colors.text, lineHeight: 26 },
   qtyNum: { fontSize: 18, fontWeight: "700", color: Colors.text, minWidth: 24, textAlign: "center" },
+  qtyNumInput: {
+    fontSize: 18, fontWeight: "700", color: Colors.text,
+    minWidth: 40, textAlign: "center",
+    borderBottomWidth: 1, borderBottomColor: "#CCC", paddingVertical: 0,
+  },
+  quickQtyBtn: {
+    backgroundColor: "#F0F2F5", borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: "#DDD",
+  },
+  quickQtyText: { fontSize: 12, fontWeight: "600", color: Colors.text },
 
   // Rs. input (discount + food item)
   rsInputWrap: {
