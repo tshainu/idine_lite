@@ -532,7 +532,8 @@ export default function BillingScreen() {
 
     // Snapshot everything BEFORE clearing state
     const snapCart = cart.map(i => ({
-      name: i.portionName ? `${i.productName} (${i.portionName})` : i.productName,
+      name: i.productName,
+      portionName: i.portionName,
       qty: i.qty,
       price: i.unitPrice,
       amt: i.qty * i.unitPrice,
@@ -950,14 +951,14 @@ export default function BillingScreen() {
                     <Text style={s.portionPickName}>{p.name}</Text>
                     <Text style={s.portionPickPrice}>LKR.{p.price.toFixed(2)}</Text>
                   </View>
-                  {/* Quick qty grid — 5 per row */}
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-                    {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map((q) => {
+                  {/* Quick qty grid — single line */}
+                  <View style={{ flexDirection: "row", gap: 6, marginBottom: 10 }}>
+                    {[5, 10, 15, 20, 30, 50].map((q) => {
                       const active = portionQtys[p.id] === q;
                       return (
                         <TouchableOpacity
                           key={q}
-                          style={[s.quickQtyBtn, active && s.quickQtyBtnActive, { flex: 1, minWidth: "16%" }]}
+                          style={[s.quickQtyBtn, active && s.quickQtyBtnActive, { flex: 1 }]}
                           onPress={() => setPortionQtys((prev) => ({ ...prev, [p.id]: q }))}
                         >
                           <Text style={[s.quickQtyText, active && s.quickQtyTextActive]}>{q}</Text>
@@ -1384,7 +1385,7 @@ export default function BillingScreen() {
                           time: `${hh}:${min}`,
                           cashier: session?.user?.username ?? "-",
                           orderType: order.order_type ?? "dine-in",
-                          items: order.items.map(it => ({ name: it.product_name + (it.portion_name ? ` (${it.portion_name})` : ""), qty: it.qty, price: it.unit_price, amt: it.line_total })),
+                          items: order.items.map(it => ({ name: it.product_name, portionName: it.portion_name ?? undefined, qty: it.qty, price: it.unit_price, amt: it.line_total })),
                           subtotal,
                           discount: order.discount,
                           total: order.total,

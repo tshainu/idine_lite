@@ -32,7 +32,7 @@ export function buildReceiptEsc(
     time: string;
     cashier: string;
     orderType?: "dine-in" | "takeaway";
-    items: { name: string; qty: number; price?: number; amt: number }[];
+    items: { name: string; portionName?: string; qty: number; price?: number; amt: number }[];
     subtotal: number;
     discount: number;
     total: number;
@@ -86,12 +86,23 @@ export function buildReceiptEsc(
   // ── Items ──
   data.items.forEach((it, i) => {
     const idx = `${i + 1}`;
-    const nameCol = `${idx}  ${it.name}`;
-    const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
-    const rightCol = is80
-      ? `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`
-      : `${it.qty}  Rs.${fmt(it.amt)}`;
-    esc += lr(nameCol, rightCol, W);
+    if (is80) {
+      const nameCol = `${idx}  ${it.name}`;
+      const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
+      esc += lr(nameCol, `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`, W);
+    } else {
+      // 58mm: truncate name, portion first 3 chars in (), no Rs. on amt
+      const ptnTag = it.portionName
+        ? ` (${it.portionName.slice(0, 3)})`
+        : "";
+      const rightCol = `${it.qty}  ${fmt(it.amt)}`;
+      const maxNameLen = W - rightCol.length - `${idx}  `.length - 2;
+      let name = it.name;
+      if ((name + ptnTag).length > maxNameLen) {
+        name = name.slice(0, Math.max(1, maxNameLen - ptnTag.length - 3)) + "...";
+      }
+      esc += lr(`${idx}  ${name}${ptnTag}`, rightCol, W);
+    }
   });
 
   esc += div;
