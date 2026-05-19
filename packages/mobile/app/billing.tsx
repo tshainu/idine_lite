@@ -301,7 +301,7 @@ export default function BillingScreen() {
     billNo: number; date: string; time: string;
     shopName: string; shopAddress: string; shopPhone: string;
     cashier: string; orderType: "dine-in" | "takeaway";
-    items: { name: string; qty: number; price: number; amt: number }[];
+    items: { name: string; portionName?: string; qty: number; price: number; amt: number }[];
     subtotal: number; discount: number; total: number; paid: number; balance: number;
   } | null>(null);
 
@@ -1216,7 +1216,7 @@ export default function BillingScreen() {
                 {receiptData.items.map((item, i) => (
                   <View key={i} style={s.rcTblRow}>
                     <Text style={[s.rcTblTd, { width: 22, color: "#888" }]}>{i + 1}</Text>
-                    <Text style={[s.rcTblTd, { flex: 1 }]} numberOfLines={2}>{item.name}</Text>
+                    <Text style={[s.rcTblTd, { flex: 1 }]} numberOfLines={2}>{item.name}{item.portionName ? ` (${item.portionName.slice(0, 3)})` : ""}</Text>
                     <Text style={[s.rcTblTd, { width: 34, textAlign: "center" }]}>{item.qty}</Text>
                     <Text style={[s.rcTblTd, { width: 60, textAlign: "right", color: "#555" }]}>{item.price.toLocaleString("en-LK")}</Text>
                     <Text style={[s.rcTblTd, { width: 60, textAlign: "right", fontWeight: "700" }]}>{item.amt.toLocaleString("en-LK")}</Text>

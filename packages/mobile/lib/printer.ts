@@ -87,7 +87,8 @@ export function buildReceiptEsc(
   data.items.forEach((it, i) => {
     const idx = `${i + 1}`;
     if (is80) {
-      const nameCol = `${idx}  ${it.name}`;
+      const ptn80 = it.portionName ? ` (${it.portionName.slice(0, 3)})` : "";
+      const nameCol = `${idx}  ${it.name}${ptn80}`;
       const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
       esc += lr(nameCol, `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`, W);
     } else {
