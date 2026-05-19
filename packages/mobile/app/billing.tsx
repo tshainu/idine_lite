@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   BackHandler, View, Text, StyleSheet, ScrollView, TouchableOpacity,
   FlatList, Modal, TextInput, Alert, Platform, useWindowDimensions, Image,
   Animated, RefreshControl,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
   List, MagnifyingGlass, X, Check, Printer, CookingPot, ShoppingCart,
 } from "phosphor-react-native";
@@ -345,6 +345,9 @@ export default function BillingScreen() {
       setKotPrinterPort(kotPort);
     });
   }, []);
+
+  // Reload products every time screen comes into focus
+  useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = () => {
     if (Platform.OS === "web") {
