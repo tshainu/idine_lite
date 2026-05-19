@@ -76,7 +76,6 @@ export function buildReceiptEsc(
     `Bill No: ${String(data.billNo).padStart(3, "0")}` +
     " ".repeat(Math.max(1, W - `Bill No: ${String(data.billNo).padStart(3, "0")}`.length - `${data.date}  ${data.time}`.length)) +
     `${data.date}  ${data.time}\n` +
-    `Payment: Cash\n` +
     div;
 
   // ── Items table header ──
@@ -119,7 +118,7 @@ export function buildReceiptEsc(
   esc +=
     "\x1B\x61\x01" +      // center
     `${footerMsg}\n` +
-    div +
+    (is80 ? div : "") +
     `${FOOTER}\n` +
     feedLines +
     "\x1D\x56\x00";       // cut
