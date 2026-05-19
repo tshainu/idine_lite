@@ -8,7 +8,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import {
-  List, MagnifyingGlass, X, Check, Printer, CookingPot,
+  List, MagnifyingGlass, X, Check, Printer, CookingPot, ShoppingCart,
 } from "phosphor-react-native";
 import { Colors, Spacing, Radius } from "../lib/theme";
 import db from "../lib/database";
@@ -841,10 +841,11 @@ export default function BillingScreen() {
               <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
             </View>
             <TouchableOpacity style={s.cardAddBtn} onPress={() => handleSelectProduct(item)}>
+              <ShoppingCart size={14} color="#fff" weight="bold" />
               <Text style={s.cardAddBtnText}>Add to Billing</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.selectBtn} onPress={() => handleSelectProduct(item)}>
-              <Text style={s.selectBtnText}>+</Text>
+              <ShoppingCart size={16} color="#fff" weight="bold" />
             </TouchableOpacity>
           </TouchableOpacity>
         )}
@@ -1534,6 +1535,7 @@ const s = StyleSheet.create({
   cardAddBtn: {
     backgroundColor: Colors.primary,
     paddingVertical: 4, alignItems: "center",
+    flexDirection: "row", justifyContent: "center", gap: 4,
   },
   cardAddBtnText: { color: "#fff", fontSize: 10, fontWeight: "600" },
   selectBtn: {
