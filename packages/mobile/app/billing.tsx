@@ -840,8 +840,11 @@ export default function BillingScreen() {
             <View style={[s.cardBody, { flex: 1 }]}>
               <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
             </View>
+            <TouchableOpacity style={s.cardAddBtn} onPress={() => handleSelectProduct(item)}>
+              <Text style={s.cardAddBtnText}>Add to Billing</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={s.selectBtn} onPress={() => handleSelectProduct(item)}>
-              <Text style={s.selectBtnText}>Select</Text>
+              <Text style={s.selectBtnText}>+</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         )}
@@ -1528,11 +1531,16 @@ const s = StyleSheet.create({
   cardName: { fontSize: 13, fontWeight: "700", color: Colors.text, lineHeight: 16 },
   cardDesc: { fontSize: 9, color: Colors.textMuted, marginTop: 1, lineHeight: 12 },
   cardPrice: { fontSize: 11, fontWeight: "700", color: Colors.text, marginTop: 3 },
+  cardAddBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 4, alignItems: "center",
+  },
+  cardAddBtnText: { color: "#fff", fontSize: 10, fontWeight: "600" },
   selectBtn: {
     backgroundColor: Colors.green,
-    paddingVertical: 6, alignItems: "center",
+    paddingVertical: 4, alignItems: "center",
   },
-  selectBtnText: { color: "#fff", fontSize: 11, fontWeight: "600" },
+  selectBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", lineHeight: 18 },
 
   // Empty
   emptyWrap: { alignItems: "center", padding: 40 },
