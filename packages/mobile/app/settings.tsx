@@ -894,7 +894,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5,
   },
   ieBtnText: { ...Typography.caption, color: Colors.primary, fontWeight: "600" },
-  divider: { height: 1, backgroundColor: Colors.border, marginVertical: 4 },
 
   // ── Sync bar (fixed bottom) ──
   syncBar: {
