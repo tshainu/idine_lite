@@ -11,8 +11,7 @@ import {
   ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass, CookingPot, LockKey,
   Export, Import, ShoppingBag, ChartBar,
 } from "phosphor-react-native";
-let RNBluetoothClassic: any = null;
-try { RNBluetoothClassic = require("react-native-bluetooth-classic").default; } catch { RNBluetoothClassic = null; }
+import RNBluetoothClassic from "react-native-bluetooth-classic";
 import { printWifi, printBluetooth, buildTestEsc, buildKotEsc, type PaperSize } from "../lib/printer";
 import { Colors, Spacing, Radius, Typography } from "../lib/theme";
 import { store } from "../lib/store";
