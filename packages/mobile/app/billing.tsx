@@ -742,8 +742,6 @@ export default function BillingScreen() {
         Alert.alert("KOT Print Failed", e?.message ?? "Could not reach printer.");
       }
 
-      setCart([]);
-      setBillNo((prev) => prev + 1);
     }
   };
 
