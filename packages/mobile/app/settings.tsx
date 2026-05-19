@@ -9,14 +9,12 @@ import { router } from "expo-router";
 import {
   ArrowLeft, Printer, SignOut, Info,
   ArrowsClockwise, Database, BluetoothConnected, MagnifyingGlass, CookingPot, LockKey,
-  Export, Import, ShoppingBag, ChartBar,
 } from "phosphor-react-native";
 import RNBluetoothClassic from "react-native-bluetooth-classic";
 import { printWifi, printBluetooth, buildTestEsc, buildKotEsc, type PaperSize } from "../lib/printer";
 import { Colors, Spacing, Radius, Typography } from "../lib/theme";
 import { store } from "../lib/store";
 import { logoutUser } from "../lib/auth";
-import { exportItems, importItems, exportSales } from "../lib/importExport";
 import { syncWithServer } from "../lib/sync";
 
 // ── BT device type ──────────────────────────────────────────────
@@ -317,40 +315,6 @@ export default function SettingsScreen() {
         onPress: async () => { await logoutUser(); router.replace("/login"); }
       }
     ]);
-  };
-
-  // ── Import / Export ────────────────────────────────────────────
-  const [ieLoading, setIeLoading] = useState<string | null>(null);
-
-  const handleExportItems = async () => {
-    try {
-      setIeLoading("export_items");
-      await exportItems();
-    } catch (e: any) {
-      Alert.alert("Export Failed", e?.message ?? "Could not export items.");
-    } finally { setIeLoading(null); }
-  };
-
-  const handleImportItems = async () => {
-    try {
-      setIeLoading("import_items");
-      const shopId = Number(session?.shop?.id ?? 1);
-      const { inserted, skipped, errors } = await importItems(shopId);
-      let msg = `Imported: ${inserted}  |  Skipped: ${skipped}`;
-      if (errors.length) msg += `\n\nWarnings:\n${errors.slice(0, 5).join("\n")}`;
-      Alert.alert("Import Complete", msg);
-    } catch (e: any) {
-      if (e?.message !== "Cancelled") Alert.alert("Import Failed", e?.message ?? "Could not import items.");
-    } finally { setIeLoading(null); }
-  };
-
-  const handleExportSales = async () => {
-    try {
-      setIeLoading("export_sales");
-      await exportSales();
-    } catch (e: any) {
-      Alert.alert("Export Failed", e?.message ?? "Could not export sales.");
-    } finally { setIeLoading(null); }
   };
 
   // ── Render ─────────────────────────────────────────────────────
@@ -717,48 +681,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Data / Backup */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data &amp; Backup</Text>
-          <View style={styles.card}>
-            {/* Items row */}
-            <View style={styles.infoRow}>
-              <ShoppingBag size={18} color={Colors.textSecondary} />
-              <Text style={[styles.cardLabel, { flex: 1 }]}>Items</Text>
-              <TouchableOpacity
-                style={styles.ieBtn}
-                onPress={handleImportItems}
-                disabled={ieLoading}
-              >
-                <Import size={15} color={Colors.primary} />
-                <Text style={styles.ieBtnText}>Import</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.ieBtn, { marginLeft: 8 }]}
-                onPress={handleExportItems}
-                disabled={ieLoading}
-              >
-                <Export size={15} color={Colors.primary} />
-                <Text style={styles.ieBtnText}>Export</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.ieDivider} />
-            {/* Sales row */}
-            <View style={styles.infoRow}>
-              <ChartBar size={18} color={Colors.textSecondary} />
-              <Text style={[styles.cardLabel, { flex: 1 }]}>Sales</Text>
-              <TouchableOpacity
-                style={styles.ieBtn}
-                onPress={handleExportSales}
-                disabled={ieLoading}
-              >
-                <Export size={15} color={Colors.primary} />
-                <Text style={styles.ieBtnText}>Export CSV</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
         {/* App Info */}
         <View style={styles.section}>
           <View style={styles.card}>
@@ -886,14 +808,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   logoutText: { ...Typography.button, color: Colors.red },
-
-  ieDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 4 },
-  ieBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    borderWidth: 1, borderColor: Colors.primary, borderRadius: 6,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  ieBtnText: { ...Typography.caption, color: Colors.primary, fontWeight: "600" },
 
   // ── Sync bar (fixed bottom) ──
   syncBar: {
