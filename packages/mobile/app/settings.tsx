@@ -106,7 +106,8 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     const load = async () => {
-      const [url, bt, ip, port, ptype, paper, footer, s, last, kotEnabled, kotIp, kotPort] = await Promise.all([
+      // Load printer + quick settings first (no dynamic imports)
+      const [url, bt, ip, port, ptype, paper, footer, last, kotEnabled, kotIp, kotPort] = await Promise.all([
         store.getApiUrl(),
         store.getPrinterAddress(),
         store.getWifiPrinterIp(),
@@ -114,10 +115,6 @@ export default function SettingsScreen() {
         store.getPrinterType(),
         store.getPaperSize(),
         store.getReceiptFooter(),
-        (async () => {
-          const { getSession } = await import("../lib/auth");
-          return getSession();
-        })(),
         store.getLastSync(),
         store.getKotPrinterEnabled(),
         store.getKotPrinterIp(),
@@ -130,11 +127,15 @@ export default function SettingsScreen() {
       setPrinterType(ptype);
       setPaperSize(paper);
       setReceiptFooter(footer);
-      setSession(s);
       setLastSync(last);
       setKotPrinterEnabled(kotEnabled);
       setKotPrinterIp(kotIp);
       setKotPrinterPort(kotPort);
+
+      // Load session separately (dynamic import is slow)
+      const { getSession } = await import("../lib/auth");
+      const s = await getSession();
+      setSession(s);
     };
     load();
   }, []);
