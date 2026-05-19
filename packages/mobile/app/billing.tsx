@@ -819,14 +819,14 @@ export default function BillingScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} tintColor={Colors.primary} />
         }
         renderItem={({ item }) => (
-          <TouchableOpacity style={[s.card, { width: ITEM_W }]} onPress={() => handleSelectProduct(item)} activeOpacity={0.85}>
+          <TouchableOpacity style={[s.card, { width: ITEM_W, flexDirection: "column" }]} onPress={() => handleSelectProduct(item)} activeOpacity={0.85}>
             <TouchableOpacity style={s.cardImgWrap} onPress={() => handleSelectProduct(item)} activeOpacity={0.85}>
               {item.image_url
                 ? <Image source={{ uri: item.image_url }} style={s.cardImg} resizeMode="cover" />
                 : <View style={s.cardImgPlaceholder}><Text style={s.cardImgEmoji}>🍽️</Text></View>
               }
             </TouchableOpacity>
-            <View style={s.cardBody}>
+            <View style={[s.cardBody, { flex: 1 }]}>
               <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
             </View>
             <TouchableOpacity style={s.selectBtn} onPress={() => handleSelectProduct(item)}>
@@ -1519,7 +1519,6 @@ const s = StyleSheet.create({
   tableRow: {
     flexDirection: "row", alignItems: "flex-start",
     paddingHorizontal: 8, paddingVertical: 4,
-    borderBottomWidth: 1, borderBottomColor: "#F2F2F2",
   },
   td: { fontSize: 12, color: Colors.text },
   emptyCart: { height: 60, alignItems: "center", justifyContent: "center" },
