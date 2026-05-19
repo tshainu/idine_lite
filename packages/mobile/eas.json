@@ -9,7 +9,11 @@
       "developmentClient": true,
       "distribution": "internal"
     },
-    "preview": {}
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      }
+    }
   },
   "submit": {
     "production": {
