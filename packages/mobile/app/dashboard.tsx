@@ -298,6 +298,12 @@ function DrawerMenu({ session, onClose, onNavigate }: {
           </View>
         )}
         <View style={dd.divider} />
+        <TouchableOpacity style={[dd.section, { backgroundColor: "#1a6b3c" }]} onPress={() => nav("/billing")}>
+          <Text style={[dd.secNum, { color: "#fff" }]}>🧾</Text>
+          <Text style={[dd.secLabel, { color: "#fff", fontWeight: "800" }]}>New Bill</Text>
+          <Text style={[dd.chevron, { color: "#fff" }]}>›</Text>
+        </TouchableOpacity>
+        <View style={dd.divider} />
         <TouchableOpacity style={dd.section} onPress={() => nav("/users")}><Text style={dd.secNum}>2.</Text><Text style={dd.secLabel}>User Management</Text><Text style={dd.chevron}>›</Text></TouchableOpacity>
         <View style={dd.divider} />
         <TouchableOpacity style={dd.section} onPress={() => nav("/settings")}><Text style={dd.secNum}>3.</Text><Text style={dd.secLabel}>Settings</Text><Text style={dd.chevron}>›</Text></TouchableOpacity>
