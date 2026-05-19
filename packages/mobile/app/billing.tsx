@@ -861,12 +861,12 @@ export default function BillingScreen() {
             </View>
           ) : cart.map((item, idx) => (
             <TouchableOpacity key={idx} style={s.tableRow} onPress={() => updateQty(idx, 1)} onLongPress={() => updateQty(idx, -1)}>
-              <Text style={[s.td, { width: 22, fontSize: 11, minHeight: 32, paddingTop: 2 }]}>{idx + 1}.</Text>
-              <Text style={[s.td, { flex: 1, minHeight: 32 }]} numberOfLines={2} ellipsizeMode="tail">{item.productName}</Text>
-              <Text style={[s.td, { width: 32, fontSize: 11, minHeight: 32, paddingTop: 2 }]} numberOfLines={1}>{item.portionName ?? "-"}</Text>
-              <Text style={[s.td, { width: 30, textAlign: "center", fontWeight: "700", minHeight: 32, paddingTop: 2 }]}>{item.qty}</Text>
-              <Text style={[s.td, { width: 52, textAlign: "right", fontSize: 11, minHeight: 32, paddingTop: 2 }]}>{item.unitPrice.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
-              <Text style={[s.td, { width: 58, textAlign: "right", fontSize: 11, minHeight: 32, paddingTop: 2 }]}>{(item.qty * item.unitPrice).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
+              <Text style={[s.td, { width: 22, fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{idx + 1}.</Text>
+              <Text style={[s.td, { flex: 1, minHeight: 16 }]} numberOfLines={2} ellipsizeMode="tail">{item.productName}</Text>
+              <Text style={[s.td, { width: 32, fontSize: 11, minHeight: 16, paddingTop: 1 }]} numberOfLines={1}>{item.portionName ?? "-"}</Text>
+              <Text style={[s.td, { width: 30, textAlign: "center", fontWeight: "700", minHeight: 16, paddingTop: 1 }]}>{item.qty}</Text>
+              <Text style={[s.td, { width: 52, textAlign: "right", fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{item.unitPrice.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
+              <Text style={[s.td, { width: 58, textAlign: "right", fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{(item.qty * item.unitPrice).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -1538,7 +1538,7 @@ const s = StyleSheet.create({
   tableScroll: { height: 96 },
   tableRow: {
     flexDirection: "row", alignItems: "flex-start",
-    paddingHorizontal: 8, paddingVertical: 4,
+    paddingHorizontal: 8, paddingVertical: 2,
   },
   td: { fontSize: 12, color: Colors.text },
   emptyCart: { height: 60, alignItems: "center", justifyContent: "center" },
