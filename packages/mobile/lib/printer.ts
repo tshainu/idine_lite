@@ -79,30 +79,56 @@ export function buildReceiptEsc(
     div;
 
   // ── Items table header ──
-  esc +=
-    lr("#  ITEM", is80 ? "QTY  PRICE    AMT" : "QTY    AMT", W) +
-    div;
+  if (is80) {
+    // match fixed cols: qty(3) price(10) amt(10) = 23, pad left for name area
+    const hdrRight = `${"QTY".padStart(3)}${"PRICE".padStart(10)}${"AMT".padStart(10)}`;
+    const hdrLeft  = `#  ITEM`;
+    const hdrGap   = Math.max(1, W - hdrLeft.length - hdrRight.length);
+    esc += hdrLeft + " ".repeat(hdrGap) + hdrRight + "\n" + div;
+  } else {
+    esc += lr("#  ITEM", "QTY    AMT", W) + div;
+  }
 
   // ── Items ──
   data.items.forEach((it, i) => {
     const idx = `${i + 1}`;
     if (is80) {
+      // 80mm fixed columns: #(3) | name+portion(flex) | qty(4) | price(10) | amt(10)
       const ptn80 = it.portionName ? ` (${it.portionName.slice(0, 3)})` : "";
-      const nameCol = `${idx}  ${it.name}${ptn80}`;
       const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
-      esc += lr(nameCol, `${it.qty}  ${priceStr}  Rs.${fmt(it.amt)}`, W);
-    } else {
-      // 58mm: truncate name, portion first 3 chars in (), no Rs. on amt
-      const ptnTag = it.portionName
-        ? ` (${it.portionName.slice(0, 3)})`
-        : "";
-      const rightCol = `${it.qty}  ${fmt(it.amt)}`;
-      const maxNameLen = W - rightCol.length - `${idx}  `.length - 2;
-      let name = it.name;
-      if ((name + ptnTag).length > maxNameLen) {
-        name = name.slice(0, Math.max(1, maxNameLen - ptnTag.length - 3)) + "...";
+      const qtyCol  = String(it.qty).padStart(3);
+      const priceCol = priceStr.padStart(10);
+      const amtCol   = `Rs.${fmt(it.amt)}`.padStart(10);
+      const rightFixed = `${qtyCol}${priceCol}${amtCol}`;
+      const nameMaxLen = W - 3 - rightFixed.length - 1; // 3 = "##  " prefix max
+      const fullName = `${it.name}${ptn80}`;
+      // wrap long names
+      if (fullName.length <= nameMaxLen) {
+        esc += `${idx.padEnd(2)}  ${fullName.padEnd(nameMaxLen)} ${rightFixed}\n`;
+      } else {
+        const line1 = fullName.slice(0, nameMaxLen);
+        const line2 = fullName.slice(nameMaxLen);
+        esc += `${idx.padEnd(2)}  ${line1.padEnd(nameMaxLen)} ${rightFixed}\n`;
+        esc += `    ${line2}\n`;
       }
-      esc += lr(`${idx}  ${name}${ptnTag}`, rightCol, W);
+    } else {
+      // 58mm: wrap item name at 15 chars, full name + portion, no Rs. on amt
+      const ptnTag = it.portionName ? ` (${it.portionName.slice(0, 3)})` : "";
+      const rightCol = `${it.qty}  ${fmt(it.amt)}`;
+      const fullName = `${it.name}${ptnTag}`;
+      const WRAP = 15;
+      if (fullName.length <= WRAP) {
+        esc += lr(`${idx}  ${fullName}`, rightCol, W);
+      } else {
+        // first line: index + first 15 chars, right col
+        esc += lr(`${idx}  ${fullName.slice(0, WRAP)}`, rightCol, W);
+        // remaining lines: indented, no right col
+        let rest = fullName.slice(WRAP);
+        while (rest.length > 0) {
+          esc += `    ${rest.slice(0, WRAP)}\n`;
+          rest = rest.slice(WRAP);
+        }
+      }
     }
   });
 
