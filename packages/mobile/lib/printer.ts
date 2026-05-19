@@ -61,17 +61,11 @@ export function buildReceiptEsc(
 
   esc += div;
 
-  // ── ORDER # — always double width + double height ──
+  // ── ORDER # + order type — single line, double height (18pt) ──
+  const orderTypeLabel = data.orderType === "takeaway" ? "Take Away" : "Dine In";
   esc +=
-    "\x1B\x21\x30" +    // double width + double height
-    `ORDER  #${String(data.billNo).padStart(3, "0")}\n` +
-    "\x1B\x21\x00";
-
-  // ── Order type line ──
-  const orderTypeLabel = data.orderType === "takeaway" ? "TAKE AWAY" : "DINE IN";
-  esc +=
-    "\x1B\x21\x10" +    // double height
-    `${orderTypeLabel}\n` +
+    "\x1B\x21\x10" +    // double height only (~18pt)
+    `ORDER # ${String(data.billNo).padStart(3, "0")}  (${orderTypeLabel})\n` +
     "\x1B\x21\x00";
 
   esc += div;
@@ -107,9 +101,9 @@ export function buildReceiptEsc(
   esc += lr("Sub Total", `Rs.${fmt(data.subtotal)}`, W);
   if (data.discount > 0) esc += lr("Discount", `- Rs.${fmt(data.discount)}`, W);
 
-  // Net Pay — bold/double height
+  // Net Pay — double height (~18pt)
   esc +=
-    "\x1B\x21\x30" +
+    "\x1B\x21\x10" +
     lr("Net Pay", `Rs.${fmt(data.total)}`, W) +
     "\x1B\x21\x00";
 
