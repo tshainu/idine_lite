@@ -346,8 +346,31 @@ export default function BillingScreen() {
     });
   }, []);
 
-  // Reload products every time screen comes into focus
-  useFocusEffect(useCallback(() => { loadData(); }, []));
+  // Reload products + printer settings every time screen comes into focus
+  useFocusEffect(useCallback(() => {
+    loadData();
+    Promise.all([
+      store.getPrinterType(),
+      store.getPrinterAddress(),
+      store.getWifiPrinterIp(),
+      store.getWifiPrinterPort(),
+      store.getPaperSize(),
+      store.getReceiptFooter(),
+      store.getKotPrinterEnabled(),
+      store.getKotPrinterIp(),
+      store.getKotPrinterPort(),
+    ]).then(([ptype, addr, ip, port, paper, footer, kotEnabled, kotIp, kotPort]) => {
+      setPrinterType(ptype);
+      setPrinterAddr(addr ?? "");
+      setWifiPrinterIp(ip);
+      setWifiPrinterPort(port);
+      setPaperSize(paper);
+      setReceiptFooter(footer);
+      setKotPrinterEnabled(kotEnabled);
+      setKotPrinterIp(kotIp);
+      setKotPrinterPort(kotPort);
+    });
+  }, []));
 
   const loadData = () => {
     if (Platform.OS === "web") {
