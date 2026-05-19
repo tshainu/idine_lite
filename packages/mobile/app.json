@@ -53,7 +53,8 @@
           "fonts": []
         }
       ],
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-document-picker"
     ],
     "owner": "shainu"
   }
