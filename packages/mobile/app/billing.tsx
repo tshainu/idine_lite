@@ -945,38 +945,44 @@ export default function BillingScreen() {
               // Base price row (shown only if product has portions — it's the "default" option)
               ...portionModal.portions.map((p) => (
                 <View key={p.id} style={s.portionPickRow}>
-                  <View>
+                  {/* Name + price */}
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                     <Text style={s.portionPickName}>{p.name}</Text>
                     <Text style={s.portionPickPrice}>LKR.{p.price.toFixed(2)}</Text>
                   </View>
-                  <View style={{ alignItems: "flex-end", gap: 6 }}>
-                    {/* Quick qty buttons */}
-                    <View style={{ flexDirection: "row", gap: 4 }}>
-                      {[1, 2, 3, 5, 10].map((q) => (
-                        <TouchableOpacity key={q} style={s.quickQtyBtn} onPress={() => setPortionQtys((prev) => ({ ...prev, [p.id]: q }))}>
-                          <Text style={s.quickQtyText}>{q}</Text>
+                  {/* Quick qty grid — 5 per row */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                    {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map((q) => {
+                      const active = portionQtys[p.id] === q;
+                      return (
+                        <TouchableOpacity
+                          key={q}
+                          style={[s.quickQtyBtn, active && s.quickQtyBtnActive, { flex: 1, minWidth: "16%" }]}
+                          onPress={() => setPortionQtys((prev) => ({ ...prev, [p.id]: q }))}
+                        >
+                          <Text style={[s.quickQtyText, active && s.quickQtyTextActive]}>{q}</Text>
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                    {/* +/- with editable qty */}
-                    <View style={s.qtyRow}>
-                      <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, -1)}>
-                        <Text style={s.qtyBtnText}>−</Text>
-                      </TouchableOpacity>
-                      <TextInput
-                        style={s.qtyNumInput}
-                        keyboardType="number-pad"
-                        value={String(portionQtys[p.id] ?? 0)}
-                        onChangeText={(v) => {
-                          const n = parseInt(v, 10);
-                          setPortionQtys((prev) => ({ ...prev, [p.id]: isNaN(n) ? 0 : Math.max(0, n) }));
-                        }}
-                        selectTextOnFocus
-                      />
-                      <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, 1)}>
-                        <Text style={s.qtyBtnText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+                      );
+                    })}
+                  </View>
+                  {/* +/- with editable qty */}
+                  <View style={[s.qtyRow, { justifyContent: "center" }]}>
+                    <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, -1)}>
+                      <Text style={s.qtyBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <TextInput
+                      style={s.qtyNumInput}
+                      keyboardType="number-pad"
+                      value={String(portionQtys[p.id] ?? 0)}
+                      onChangeText={(v) => {
+                        const n = parseInt(v, 10);
+                        setPortionQtys((prev) => ({ ...prev, [p.id]: isNaN(n) ? 0 : Math.max(0, n) }));
+                      }}
+                      selectTextOnFocus
+                    />
+                    <TouchableOpacity style={s.qtyBtn} onPress={() => changePortionQty(p.id, 1)}>
+                      <Text style={s.qtyBtnText}>+</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               )),
@@ -1079,11 +1085,13 @@ export default function BillingScreen() {
             {(() => {
               const paid = parseFloat(collected || "0");
               const bal = paid - total;
+              const isShort = bal < 0;
+              const isExact = bal === 0;
               return (
                 <Text style={s.pbBalLine}>
                   Balance :{" "}
-                  <Text style={[s.pbBalAmt, { color: "#2E7D32" }]}>
-                    Rs.{Math.abs(bal).toLocaleString("en-LK")}
+                  <Text style={[s.pbBalAmt, { color: isShort ? "#C62828" : isExact ? "#111" : "#2E7D32" }]}>
+                    {isShort ? `(−) Rs.${Math.abs(bal).toLocaleString("en-LK")}` : `(+) Rs.${bal.toLocaleString("en-LK")}`}
                   </Text>
                 </Text>
               );
@@ -1612,29 +1620,35 @@ const s = StyleSheet.create({
 
   // Portion pick rows
   portionPickRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
+    flexDirection: "column",
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
   },
-  portionPickName: { fontSize: 15, fontWeight: "600", color: Colors.text },
-  portionPickPrice: { fontSize: 12, color: Colors.textMuted },
-  qtyRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  portionPickName: { fontSize: 15, fontWeight: "700", color: Colors.text },
+  portionPickPrice: { fontSize: 13, fontWeight: "600", color: Colors.primary },
+  qtyRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   qtyBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "#E8E8E8", alignItems: "center", justifyContent: "center",
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center",
+    elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2,
   },
-  qtyBtnText: { fontSize: 22, fontWeight: "700", color: Colors.text, lineHeight: 26 },
-  qtyNum: { fontSize: 18, fontWeight: "700", color: Colors.text, minWidth: 24, textAlign: "center" },
+  qtyBtnText: { fontSize: 26, fontWeight: "700", color: "#fff", lineHeight: 30 },
+  qtyNum: { fontSize: 20, fontWeight: "700", color: Colors.text, minWidth: 28, textAlign: "center" },
   qtyNumInput: {
-    fontSize: 18, fontWeight: "700", color: Colors.text,
-    minWidth: 40, textAlign: "center",
-    borderBottomWidth: 1, borderBottomColor: "#CCC", paddingVertical: 0,
+    fontSize: 22, fontWeight: "700", color: Colors.text,
+    minWidth: 56, textAlign: "center",
+    borderWidth: 1.5, borderColor: "#CCC", borderRadius: 8,
+    paddingVertical: 4, paddingHorizontal: 8, backgroundColor: "#F9F9F9",
   },
   quickQtyBtn: {
-    backgroundColor: "#F0F2F5", borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderWidth: 1, borderColor: "#DDD",
+    backgroundColor: "#F0F2F5", borderRadius: 8,
+    paddingVertical: 7, alignItems: "center",
+    borderWidth: 1.5, borderColor: "#DDD",
   },
-  quickQtyText: { fontSize: 12, fontWeight: "600", color: Colors.text },
+  quickQtyBtnActive: {
+    backgroundColor: Colors.primary, borderColor: Colors.primary,
+  },
+  quickQtyText: { fontSize: 13, fontWeight: "600", color: Colors.text },
+  quickQtyTextActive: { color: "#fff" },
 
   // Rs. input (discount + food item)
   rsInputWrap: {
