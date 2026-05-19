@@ -805,6 +805,8 @@ export default function BillingScreen() {
         ))}
       </ScrollView>
 
+      {/* ── Product grid + Cart panel wrapper ── */}
+      <View style={{ flex: 1 }}>
       {/* ── Product grid ── */}
       <FlatList
         data={filteredProducts}
@@ -882,6 +884,7 @@ export default function BillingScreen() {
           </View>
         </View>
       </View>
+      </View>{/* ── end flex:1 wrapper ── */}
 
       {/* ── Bottom Action Bar ── */}
       <View style={[s.bottomBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -1469,7 +1472,7 @@ const s = StyleSheet.create({
   catTabTextActive: { color: "#fff", fontWeight: "700" },
 
   // Product grid
-  grid: { flex: 1, backgroundColor: "#F0F2F5", maxHeight: 700 },
+  grid: { flex: 1, backgroundColor: "#F0F2F5" },
   gridContent: { padding: Spacing.sm, rowGap: 4 },
   card: {
     backgroundColor: "#fff", borderRadius: Radius.md,
