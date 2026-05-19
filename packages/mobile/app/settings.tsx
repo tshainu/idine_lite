@@ -742,7 +742,7 @@ export default function SettingsScreen() {
                 <Text style={styles.ieBtnText}>Export</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.divider} />
+            <View style={styles.ieDivider} />
             {/* Sales row */}
             <View style={styles.infoRow}>
               <ChartBar size={18} color={Colors.textSecondary} />
@@ -887,6 +887,7 @@ const styles = StyleSheet.create({
   },
   logoutText: { ...Typography.button, color: Colors.red },
 
+  ieDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 4 },
   ieBtn: {
     flexDirection: "row", alignItems: "center", gap: 4,
     borderWidth: 1, borderColor: Colors.primary, borderRadius: 6,
