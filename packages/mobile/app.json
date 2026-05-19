@@ -3,6 +3,7 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.idinelite_r7k2.runable",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A73C8"
