@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import {
+  BackHandler, useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   FlatList, Modal, TextInput, Alert, Platform, useWindowDimensions, Image,
@@ -309,6 +310,15 @@ export default function BillingScreen() {
   const [discountInput, setDiscountInput] = useState("");
   const [foodItemPrice, setFoodItemPrice] = useState("");
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+
+  // Hardware back button — close receipt modal if open
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (receiptModal) { setReceiptModal(false); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [receiptModal]);
 
   useEffect(() => {
     getSession().then(setSession);
