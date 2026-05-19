@@ -840,9 +840,8 @@ export default function BillingScreen() {
             <View style={[s.cardBody, { flex: 1 }]}>
               <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
             </View>
-            <TouchableOpacity style={s.cardAddBtn} onPress={() => handleSelectProduct(item)} activeOpacity={0.8}>
-              <ShoppingCart size={14} color="#fff" weight="bold" />
-              <Text style={s.cardAddBtnText}>Add to Billing</Text>
+            <TouchableOpacity style={s.selectBtn} onPress={() => handleSelectProduct(item)} activeOpacity={0.8}>
+              <Text style={s.selectBtnText}>Select</Text>
             </TouchableOpacity>
           </View>
         )}

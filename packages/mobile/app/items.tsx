@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
-import { List, Pencil, Trash, Check, X, Plus } from "phosphor-react-native";
+import { List, Pencil, Trash, Check, X, Plus, ShoppingCart } from "phosphor-react-native";
 import { Colors, Spacing, Radius } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
@@ -327,7 +327,12 @@ export default function ItemsScreen() {
           )}
         </View>
       )}
-      {/* FAB */}
+      {/* Another Round FAB */}
+      <TouchableOpacity style={s.fabAnotherRound} onPress={() => router.push("/billing" as any)} activeOpacity={0.85}>
+        <ShoppingCart size={22} color="#fff" weight="bold" />
+        <Text style={s.fabAnotherRoundText}>Another Round</Text>
+      </TouchableOpacity>
+      {/* Add Item FAB */}
       <TouchableOpacity style={s.fab} onPress={() => router.push("/add-item" as any)} activeOpacity={0.85}>
         <Plus size={26} color="#fff" weight="bold" />
       </TouchableOpacity>
@@ -343,7 +348,9 @@ const s = StyleSheet.create({
   },
   headerIcon: { padding: 2 },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: "#fff" },
-  fab: { position: "absolute", bottom: 28, right: 22, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fab: { position: "absolute", bottom: 90, right: 22, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabAnotherRound: { position: "absolute", bottom: 156, right: 12, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.green, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 28, elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabAnotherRoundText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   pageTitle: { fontSize: 16, fontWeight: "700", color: Colors.primary, textAlign: "center", paddingVertical: 12 },
   // Dropdown
   dropWrap: { marginHorizontal: 16, marginBottom: 4, zIndex: 10 },
