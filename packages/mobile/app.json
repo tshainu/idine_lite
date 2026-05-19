@@ -13,14 +13,16 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "extra": {
       "apiUrl": "https://j7j5e2adzj0r7hr6tyiah-preview-4200.runable.site",
       "eas": {
-        "projectId": "2860721e-3ace-4a70-aa86-00fa62f5a63d"
-      }
+        "projectId": "7ae492ec-4885-485a-bf0b-52c6b9534276"
+      },
+      "router": {}
     },
     "ios": {
       "bundleIdentifier": "com.idinelite_r7k2.runable",
@@ -52,6 +54,7 @@
         }
       ],
       "expo-image-picker"
-    ]
+    ],
+    "owner": "shainu"
   }
 }
