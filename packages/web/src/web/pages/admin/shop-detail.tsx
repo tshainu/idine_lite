@@ -110,6 +110,12 @@ export default function ShopDetail() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
+  // Receipt header image
+  const [headerImage, setHeaderImage] = useState<string | null>(null);
+  const [headerSaving, setHeaderSaving] = useState(false);
+  const [headerMsg, setHeaderMsg] = useState("");
+  const headerFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => { load(); }, [shopId]);
 
   async function load() {
@@ -125,6 +131,7 @@ export default function ShopDetail() {
         address: data.shop.address ?? "",
         phone: data.shop.phone ?? "",
       });
+      setHeaderImage(data.shop.receiptHeaderImage ?? null);
     } catch (e: any) {
       if (e.message === "Unauthorized") { localStorage.removeItem("admin_token"); nav("/admin/login"); }
       else setError(e.message);
@@ -194,6 +201,30 @@ export default function ShopDetail() {
         if (taken) setCodeError(`"${code}" is already used by ${taken.name}`);
       } catch {}
     }, 400);
+  }
+
+  function handleHeaderFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { setHeaderMsg("Image too large — max 500KB."); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setHeaderImage(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    setHeaderMsg("");
+  }
+
+  async function handleHeaderSave() {
+    setHeaderSaving(true);
+    setHeaderMsg("");
+    try {
+      await adminApi.shops.uploadReceiptHeader(shopId, headerImage);
+      setHeaderMsg("Saved!");
+      setTimeout(() => setHeaderMsg(""), 3000);
+    } catch (e: any) {
+      setHeaderMsg(e.message ?? "Failed to save.");
+    } finally {
+      setHeaderSaving(false);
+    }
   }
 
   async function handleSuspend(e: React.FormEvent) {
@@ -414,6 +445,53 @@ export default function ShopDetail() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── Receipt Header Image ── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="text-sm font-semibold text-gray-800 mb-1">Receipt Header Image</h3>
+        <p className="text-xs text-gray-400 mb-4">Upload a logo/header image. This replaces the shop name, address &amp; phone on printed receipts (58mm &amp; 80mm). Max 500KB, PNG or JPG.</p>
+        <div className="flex items-start gap-4">
+          {/* Preview */}
+          <div className="flex-shrink-0 w-40 h-20 border border-dashed border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
+            {headerImage
+              ? <img src={headerImage} alt="Header preview" className="max-w-full max-h-full object-contain" />
+              : <span className="text-xs text-gray-400">No image</span>
+            }
+          </div>
+          <div className="flex-1 space-y-3">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => headerFileRef.current?.click()}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+              >
+                Choose Image
+              </button>
+              {headerImage && (
+                <button
+                  type="button"
+                  onClick={() => { setHeaderImage(null); setHeaderMsg(""); }}
+                  className="px-3 py-2 text-sm border border-red-200 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleHeaderSave}
+                disabled={headerSaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 rounded-lg transition-colors"
+              >
+                {headerSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+            {headerMsg && (
+              <p className={`text-xs ${headerMsg === "Saved!" ? "text-green-600" : "text-red-600"}`}>{headerMsg}</p>
+            )}
+            <input ref={headerFileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleHeaderFileChange} />
+          </div>
         </div>
       </div>
 

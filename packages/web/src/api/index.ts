@@ -9,6 +9,8 @@ import { sync } from "./routes/sync";
 import { users } from "./routes/users";
 import { print } from "./routes/print";
 import { admin } from "./routes/admin";
+import { units } from "./routes/units";
+import { portionTemplates } from "./routes/portionTemplates";
 
 const app = new Hono()
   .basePath("api")
@@ -22,7 +24,9 @@ const app = new Hono()
   .route("/sync", sync)
   .route("/users", users)
   .route("/print", print)
-  .route("/admin", admin);
+  .route("/admin", admin)
+  .route("/units", units)
+  .route("/portion-templates", portionTemplates);
 
 export type AppType = typeof app;
 export default app;

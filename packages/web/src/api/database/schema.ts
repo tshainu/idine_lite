@@ -13,6 +13,7 @@ export const shops = sqliteTable("shops", {
   remarks: text("remarks"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   suspendReason: text("suspend_reason"),
+  receiptHeaderImage: text("receipt_header_image"), // base64 PNG/JPG for receipt header
   lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -83,6 +84,7 @@ export const orders = sqliteTable("orders", {
   collectedAmount: real("collected_amount"),
   changeAmount: real("change_amount"),
   paymentMethod: text("payment_method", { enum: ["cash", "card", "online"] }).default("cash"),
+  orderType: text("order_type", { enum: ["dine_in", "takeaway", "delivery"] }).default("dine_in"),
   kotPrinted: integer("kot_printed", { mode: "boolean" }).notNull().default(false),
   receiptPrinted: integer("receipt_printed", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -101,6 +103,27 @@ export const orderItems = sqliteTable("order_items", {
   unitPrice: real("unit_price").notNull(),
   lineTotal: real("line_total").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+// Units (per shop)
+export const units = sqliteTable("units", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  shopId: integer("shop_id").notNull().references(() => shops.id),
+  name: text("name").notNull(),
+  abbreviation: text("abbreviation"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+});
+
+// Portion Templates (global per shop — not tied to a product)
+export const portionTemplates = sqliteTable("portion_templates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  shopId: integer("shop_id").notNull().references(() => shops.id),
+  name: text("name").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
 });
 
 // Sync Log (server side — track what was pushed per device)

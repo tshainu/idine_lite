@@ -37,7 +37,7 @@ export const auth = new Hono()
     return c.json({
       token,
       user: { id: user.id, username: user.username, role: user.role, mustChangePassword: user.mustChangePassword },
-      shop: { id: shop.id, name: shop.name, code: shop.code },
+      shop: { id: shop.id, name: shop.name, code: shop.code, address: shop.address, phone: shop.phone, receiptHeaderImage: shop.receiptHeaderImage ?? null },
     }, 200);
   })
   // Register shop (setup)

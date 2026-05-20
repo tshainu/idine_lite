@@ -15,6 +15,7 @@ const KEYS = {
   KOT_PRINTER_ENABLED: "idine_kot_printer_enabled",
   KOT_PRINTER_IP: "idine_kot_printer_ip",
   KOT_PRINTER_PORT: "idine_kot_printer_port",
+  RECEIPT_HEADER_IMAGE: "idine_receipt_header_image",
 };
 
 export interface AuthUser {
@@ -60,7 +61,7 @@ export const store = {
   },
   async getApiUrl(): Promise<string> {
     const val = await AsyncStorage.getItem(KEYS.API_URL);
-    return val ?? "https://j7j5e2adzj0r7hr6tyiah-preview-4200.runable.site";
+    return val ?? "https://idinelite-production.up.railway.app";
   },
   async setApiUrl(url: string) {
     return AsyncStorage.setItem(KEYS.API_URL, url);
@@ -126,6 +127,13 @@ export const store = {
   },
   async setKotPrinterPort(port: string) {
     return AsyncStorage.setItem(KEYS.KOT_PRINTER_PORT, port);
+  },
+  async getReceiptHeaderImage(): Promise<string | null> {
+    return AsyncStorage.getItem(KEYS.RECEIPT_HEADER_IMAGE);
+  },
+  async setReceiptHeaderImage(b64: string | null) {
+    if (b64 === null) return AsyncStorage.removeItem(KEYS.RECEIPT_HEADER_IMAGE);
+    return AsyncStorage.setItem(KEYS.RECEIPT_HEADER_IMAGE, b64);
   },
   async clearAuth() {
     return AsyncStorage.multiRemove([KEYS.AUTH_TOKEN, KEYS.AUTH_USER, KEYS.AUTH_SHOP]);

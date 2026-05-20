@@ -108,7 +108,7 @@ export default function ReportsScreen() {
               SUM(CASE WHEN order_type='dine-in' THEN 1 ELSE 0 END) as dineIn,
               SUM(CASE WHEN order_type='takeaway' THEN 1 ELSE 0 END) as takeaway
        FROM orders WHERE created_at >= ? AND created_at <= ? AND status != 'cancelled'`,
-      from, to
+      [from, to]
     ) as any;
     const total = s?.total ?? 0;
     const count = s?.count ?? 0;
@@ -128,7 +128,7 @@ export default function ReportsScreen() {
        LEFT JOIN order_items oi ON oi.order_id = o.id
        WHERE o.created_at >= ? AND o.created_at <= ? AND o.status != 'cancelled'
        GROUP BY o.id ORDER BY o.created_at DESC`,
-      from, to
+      [from, to]
     ) as Bill[];
     setBills(b);
 
@@ -139,7 +139,7 @@ export default function ReportsScreen() {
        JOIN orders o ON o.id = oi.order_id
        WHERE o.created_at >= ? AND o.created_at <= ? AND o.status != 'cancelled'
        GROUP BY oi.product_name ORDER BY revenue DESC LIMIT 10`,
-      from, to
+      [from, to]
     ) as TopItem[];
     setTopItems(top);
 
@@ -153,7 +153,7 @@ export default function ReportsScreen() {
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE o.created_at >= ? AND o.created_at <= ? AND o.status != 'cancelled'
        GROUP BY c.name ORDER BY revenue DESC`,
-      from, to
+      [from, to]
     ) as CatSales[];
     setCatSales(cats);
 
@@ -164,7 +164,7 @@ export default function ReportsScreen() {
        FROM orders
        WHERE created_at >= ? AND created_at <= ? AND status != 'cancelled'
        GROUP BY hour ORDER BY hour`,
-      from, to
+      [from, to]
     ) as any[];
     setHourlySales(
       hourly.map((h) => ({ hour: parseInt(h.hour), total: h.total, count: h.count }))

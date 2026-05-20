@@ -237,6 +237,18 @@ export const admin = new Hono()
     return c.json({ shop }, 200);
   })
 
+  // ── Upload receipt header image ──
+  .patch("/shops/:id/receipt-header", requireAdmin, async (c) => {
+    const id = parseInt(c.req.param("id"));
+    const { image } = await c.req.json(); // base64 data URL or null to clear
+    const [shop] = await db
+      .update(schema.shops)
+      .set({ receiptHeaderImage: image ?? null, updatedAt: new Date() })
+      .where(eq(schema.shops.id, id))
+      .returning();
+    return c.json({ shop }, 200);
+  })
+
   .delete("/shops/:id", requireAdmin, async (c) => {
     const id = parseInt(c.req.param("id"));
     const [shop] = await db.select().from(schema.shops).where(eq(schema.shops.id, id));

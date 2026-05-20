@@ -9,6 +9,7 @@ import { List, Pencil, Trash } from "phosphor-react-native";
 import { Colors } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
+import { serverCreateCategory, serverUpdateCategory, serverDeleteCategory } from "../lib/serverApi";
 
 interface Category { id: number; name: string; sort_order: number; }
 
@@ -104,25 +105,34 @@ export default function CategoriesScreen() {
     setCategories(cats);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) { Alert.alert("Enter category name"); return; }
-    if (Platform.OS !== "web") {
-      if (editingId) {
-        db.runSync("UPDATE categories SET name = ?, updated_at = ? WHERE id = ?",
-          [name.trim(), Date.now(), editingId]);
-      } else {
-        const maxOrder = db.getFirstSync("SELECT MAX(sort_order) as mo FROM categories WHERE deleted_at IS NULL") as any;
-        db.runSync(
-          "INSERT INTO categories (shop_id, name, sort_order, updated_at) VALUES (?, ?, ?, ?)",
-          [session?.shop?.id ?? 1, name.trim(), (maxOrder?.mo ?? 0) + 1, Date.now()]
-        );
-      }
-    } else {
+    if (Platform.OS === "web") {
       if (editingId) {
         setCategories((p) => p.map((c) => c.id === editingId ? { ...c, name: name.trim() } : c));
       } else {
         setCategories((p) => [...p, { id: Date.now(), name: name.trim(), sort_order: p.length + 1 }]);
       }
+      setName(""); setEditingId(null);
+      return;
+    }
+    try {
+      if (editingId) {
+        await serverUpdateCategory(editingId, name.trim());
+        db.runSync("UPDATE categories SET name = ?, updated_at = ? WHERE id = ?",
+          [name.trim(), Date.now(), editingId]);
+      } else {
+        const maxOrder = db.getFirstSync("SELECT MAX(sort_order) as mo FROM categories WHERE deleted_at IS NULL") as any;
+        const newSortOrder = (maxOrder?.mo ?? 0) + 1;
+        const created = await serverCreateCategory(session?.shop?.id ?? 1, name.trim(), newSortOrder);
+        db.runSync(
+          "INSERT OR REPLACE INTO categories (id, shop_id, name, sort_order, updated_at) VALUES (?, ?, ?, ?, ?)",
+          [created.id, session?.shop?.id ?? 1, name.trim(), newSortOrder, Date.now()]
+        );
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not save category");
+      return;
     }
     setName(""); setEditingId(null); loadData();
   };
@@ -137,7 +147,13 @@ export default function CategoriesScreen() {
     if (hasItems) { Alert.alert("Cannot Delete", "This category has items assigned to it."); return; }
     Alert.alert("Delete Category", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => {
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await serverDeleteCategory(id);
+        } catch (e: any) {
+          Alert.alert("Error", e?.message ?? "Could not delete");
+          return;
+        }
         db.runSync("UPDATE categories SET deleted_at = ? WHERE id = ?", [Date.now(), id]);
         loadData();
       }},

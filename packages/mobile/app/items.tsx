@@ -6,10 +6,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
-import { List, Pencil, Trash, Check, X, Plus, ShoppingCart } from "phosphor-react-native";
+import { List, Pencil, Trash, Plus, ShoppingCart } from "phosphor-react-native";
 import { Colors, Spacing, Radius } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
+import { serverDeleteProduct } from "../lib/serverApi";
 
 interface Product {
   id: number; name: string; price: number; description?: string;
@@ -158,6 +159,7 @@ export default function ItemsScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [filterCat, setFilterCat] = useState<number | null>(null);
   const [catDropOpen, setCatDropOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [session, setSession] = useState<any>(null);
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -171,9 +173,7 @@ export default function ItemsScreen() {
     else { Animated.timing(slideAnim, { toValue: -300, duration: 220, useNativeDriver: true }).start(() => setDrawerOpen(false)); }
   };
 
-  // Edit modal (inline, no Modal component — just a panel)
-  const [editPanel, setEditPanel] = useState<Product | null>(null);
-  const [form, setForm] = useState({ name: "", price: "", description: "", categoryId: "" });
+  const [form, setForm] = useState({ name: "", price: "", description: "", categoryId: "" }); // kept for potential future inline edit
 
   useEffect(() => { getSession().then(setSession); }, []);
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -191,31 +191,26 @@ export default function ItemsScreen() {
     setProducts(prods); setCategories(cats);
   };
 
-  const filtered = filterCat === null ? products : products.filter((p) => p.category_id === filterCat);
+  const filtered = products.filter((p) => {
+    const matchesCat = filterCat === null || p.category_id === filterCat;
+    const matchesSearch = searchQuery.trim() === "" ||
+      p.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+    return matchesCat && matchesSearch;
+  });
 
   const openEdit = (p: Product) => {
     router.push(`/add-item?id=${p.id}` as any);
   };
 
-  const handleSave = () => {
-    if (!form.name.trim() || !form.price.trim()) { Alert.alert("Name and price required"); return; }
-    const price = parseFloat(form.price);
-    if (isNaN(price)) { Alert.alert("Invalid price"); return; }
-    if (Platform.OS !== "web" && editPanel) {
-      db.runSync(
-        "UPDATE products SET name = ?, price = ?, description = ?, category_id = ?, updated_at = ? WHERE id = ?",
-        [form.name.trim(), price, form.description.trim(), form.categoryId ? parseInt(form.categoryId) : null, Date.now(), editPanel.id]
-      );
-    }
-    setEditPanel(null); loadData();
-  };
+
 
   const handleDelete = (id: number) => {
     if (Platform.OS === "web") { setProducts((p) => p.filter((x) => x.id !== id)); return; }
     Alert.alert("Delete Item", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => {
+      { text: "Delete", style: "destructive", onPress: async () => {
         db.runSync("UPDATE products SET deleted_at = ? WHERE id = ?", [Date.now(), id]);
+        try { await serverDeleteProduct(id); } catch (_) {}
         loadData();
       }},
     ]);
@@ -240,40 +235,26 @@ export default function ItemsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Edit panel */}
-      {editPanel && (
-        <View style={s.editPanel}>
-          <View style={s.editPanelHeader}>
-            <Text style={s.editPanelTitle}>Edit Item</Text>
-            <TouchableOpacity onPress={() => setEditPanel(null)}><X size={20} color={Colors.text} /></TouchableOpacity>
-          </View>
-          <TextInput style={s.editInput} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholder="Item name" />
-          <TextInput style={s.editInput} value={form.price} onChangeText={(v) => setForm({ ...form, price: v })} placeholder="Price" keyboardType="decimal-pad" />
-          <TextInput style={s.editInput} value={form.description} onChangeText={(v) => setForm({ ...form, description: v })} placeholder="Description" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-            {categories.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={[s.catChip, form.categoryId === String(c.id) && s.catChipActive]}
-                onPress={() => setForm({ ...form, categoryId: String(c.id) })}
-              >
-                <Text style={[s.catChipTxt, form.categoryId === String(c.id) && s.catChipTxtActive]}>{c.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <View style={s.editBtnRow}>
-            <TouchableOpacity style={s.saveBtn} onPress={handleSave}>
-              <Check size={16} color="#fff" /><Text style={s.saveTxt}> Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => setEditPanel(null)}>
-              <Text style={s.cancelTxt}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+
 
       {/* Page title */}
       <Text style={s.pageTitle}>List of items</Text>
+
+      {/* Search bar + Add button */}
+      <View style={s.searchRow}>
+        <TextInput
+          style={s.searchInput}
+          placeholder="Search items..."
+          placeholderTextColor="#AAA"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        <TouchableOpacity style={s.addBtn} onPress={() => router.push("/add-item" as any)} activeOpacity={0.85}>
+          <Plus size={20} color="#fff" weight="bold" />
+        </TouchableOpacity>
+      </View>
 
       {/* Category dropdown */}
       <View style={s.dropWrap}>
@@ -350,6 +331,21 @@ const s = StyleSheet.create({
   fab: { position: "absolute", bottom: 90, right: 22, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
   fabAnotherRound: { position: "absolute", bottom: 156, right: 22, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: Colors.green, elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
   pageTitle: { fontSize: 16, fontWeight: "700", color: Colors.primary, textAlign: "center", paddingVertical: 12 },
+  // Search row
+  searchRow: {
+    flexDirection: "row", alignItems: "center",
+    marginHorizontal: 16, marginBottom: 8, gap: 8,
+  },
+  searchInput: {
+    flex: 1, height: 44, borderWidth: 1, borderColor: "#CCC",
+    borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: "#333",
+    backgroundColor: "#fff",
+  },
+  addBtn: {
+    width: 44, height: 44, borderRadius: 8,
+    backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center",
+  },
   // Dropdown
   dropWrap: { marginHorizontal: 16, marginBottom: 4, zIndex: 10 },
   drop: {
@@ -367,36 +363,7 @@ const s = StyleSheet.create({
   dropItem: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0" },
   dropItemTxt: { fontSize: 14, color: "#333" },
   empty: { textAlign: "center", color: "#AAA", padding: 40 },
-  // Edit panel
-  editPanel: {
-    backgroundColor: "#F8F8F8", borderBottomWidth: 1, borderBottomColor: "#DDD",
-    padding: 14,
-  },
-  editPanelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  editPanelTitle: { fontSize: 15, fontWeight: "700", color: Colors.primary },
-  editInput: {
-    borderBottomWidth: 1, borderBottomColor: "#CCC",
-    fontSize: 14, color: "#222", paddingVertical: 6, marginBottom: 8,
-    backgroundColor: "transparent",
-  },
-  catChip: {
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
-    borderWidth: 1, borderColor: "#CCC", marginRight: 6, backgroundColor: "#fff",
-  },
-  catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  catChipTxt: { fontSize: 12, color: "#555" },
-  catChipTxtActive: { color: "#fff", fontWeight: "600" },
-  editBtnRow: { flexDirection: "row", gap: 10, marginTop: 6 },
-  saveBtn: {
-    flex: 1, backgroundColor: "#2E7D32", borderRadius: 20,
-    paddingVertical: 10, flexDirection: "row", alignItems: "center", justifyContent: "center",
-  },
-  saveTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  cancelBtn: {
-    flex: 1, backgroundColor: "#8B0000", borderRadius: 20,
-    paddingVertical: 10, alignItems: "center", justifyContent: "center",
-  },
-  cancelTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
   drawerWrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 },
   drawerBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.45)" },
   drawerPanel: { width: 280, position: "absolute", top: 0, left: 0, bottom: 0, zIndex: 1000 },

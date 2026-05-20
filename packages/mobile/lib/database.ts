@@ -41,7 +41,7 @@ export const initDatabase = async () => {
     );
 
     CREATE TABLE IF NOT EXISTS units (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id INTEGER PRIMARY KEY,
       shop_id INTEGER,
       name TEXT NOT NULL,
       abbreviation TEXT,
@@ -135,6 +135,7 @@ export const initDatabase = async () => {
     "ALTER TABLE products ADD COLUMN unit_id INTEGER",
     "ALTER TABLE products ADD COLUMN description TEXT",
     "ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'dine-in'",
+    "ALTER TABLE units ADD COLUMN shop_id INTEGER",
   ];
   for (const sql of migrations) {
     try { db.execSync(sql); } catch { /* column already exists */ }

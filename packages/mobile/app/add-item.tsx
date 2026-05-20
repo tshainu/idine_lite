@@ -10,6 +10,11 @@ import * as ImagePicker from "expo-image-picker";
 import { Colors } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
+import {
+  serverCreateProduct, serverUpdateProduct,
+  serverCreateCategory, serverCreatePortionTemplate,
+  pullAllFromServer,
+} from "../lib/serverApi";
 
 // ─── Types ────────────────────────────────────────────────────
 interface Category { id: number; name: string; }
@@ -284,7 +289,7 @@ export default function AddItemScreen() {
   };
 
   // ─── Add new category inline ──────────────────────────────
-  const handleAddCategory = (name: string) => {
+  const handleAddCategory = async (name: string) => {
     if (Platform.OS === "web") {
       const newId = Date.now();
       const newCat = { id: newId, name };
@@ -294,21 +299,21 @@ export default function AddItemScreen() {
     }
     try {
       const shopId = Number(session?.shop?.id ?? 1);
-      db.runSync("INSERT INTO categories (shop_id, name, sort_order) VALUES (?, ?, ?)", [shopId, name, 999]);
-      const inserted = db.getFirstSync(
-        "SELECT id FROM categories WHERE name = ? AND shop_id = ? ORDER BY id DESC LIMIT 1", [name, shopId]
-      ) as { id: number } | null;
-      const newId = inserted?.id ?? Date.now();
-      const newCat = { id: newId, name };
+      const created = await serverCreateCategory(shopId, name, 999);
+      db.runSync(
+        "INSERT OR REPLACE INTO categories (id, shop_id, name, sort_order, updated_at) VALUES (?, ?, ?, ?, ?)",
+        [created.id, shopId, name, 999, Date.now()]
+      );
+      const newCat = { id: created.id, name };
       setCategories((prev) => [...prev, newCat]);
-      setSelectedCat({ id: newId, name });
+      setSelectedCat({ id: created.id, name });
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Could not add category");
     }
   };
 
   // ─── Add new portion template inline ─────────────────────
-  const handleAddPortion = (name: string) => {
+  const handleAddPortion = async (name: string) => {
     if (Platform.OS === "web") {
       const newId = Date.now();
       const newPortion = { id: newId, name };
@@ -317,7 +322,7 @@ export default function AddItemScreen() {
       return;
     }
     try {
-      // Check if template already exists
+      // Check if template already exists locally
       const existing = db.getFirstSync(
         "SELECT id FROM portions WHERE product_id = 0 AND name = ? AND deleted_at IS NULL", [name]
       ) as { id: number } | null;
@@ -325,14 +330,15 @@ export default function AddItemScreen() {
         Alert.alert("Exists", `Portion "${name}" already exists`);
         return;
       }
-      db.runSync("INSERT INTO portions (product_id, name, price) VALUES (0, ?, 0)", [name]);
-      const inserted = db.getFirstSync(
-        "SELECT id FROM portions WHERE product_id = 0 AND name = ? ORDER BY id DESC LIMIT 1", [name]
-      ) as { id: number } | null;
-      const newId = inserted?.id ?? Date.now();
-      const newPortion = { id: newId, name };
+      const shopId = Number(session?.shop?.id ?? 1);
+      const created = await serverCreatePortionTemplate(shopId, name);
+      db.runSync(
+        "INSERT OR REPLACE INTO portions (id, product_id, name, price) VALUES (?, 0, ?, 0)",
+        [created.id, name]
+      );
+      const newPortion = { id: created.id, name };
       setPortions((prev) => [...prev, newPortion]);
-      setPortionPrices((prev) => [...prev, { portionId: newId, name, price: "" }]);
+      setPortionPrices((prev) => [...prev, { portionId: created.id, name, price: "" }]);
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Could not add portion");
     }
@@ -376,7 +382,7 @@ export default function AddItemScreen() {
     } catch { Alert.alert("Error", "Could not open camera."); }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!itemName.trim()) { Alert.alert("Required", "Item name is required"); return; }
     for (const pp of portionPrices) {
       if (!pp.price.trim() || isNaN(parseFloat(pp.price))) {
@@ -390,46 +396,39 @@ export default function AddItemScreen() {
       return;
     }
     try {
-      const ts = Date.now();
       const basePrice = portionPrices.length > 0 ? parseFloat(portionPrices[0].price) || 0 : 0;
+      const portionsPayload = portionPrices.map((pp) => ({ name: pp.name, price: parseFloat(pp.price) || 0 }));
 
       if (isEdit && editId) {
-        // UPDATE existing product
-        db.runSync(
-          `UPDATE products SET name=?, description=?, image_url=?, category_id=?, unit_id=?, price=?, updated_at=? WHERE id=?`,
-          [itemName.trim(), description.trim() || null, imageUri ?? null,
-           selectedCat?.id ?? null, selectedUnit?.id ?? null, basePrice, ts, parseInt(editId)]
-        );
-        // Delete old portions and re-insert
-        db.runSync("DELETE FROM portions WHERE product_id=?", [parseInt(editId)]);
-        for (const pp of portionPrices) {
-          db.runSync(
-            "INSERT INTO portions (product_id, name, price) VALUES (?, ?, ?)",
-            [parseInt(editId), pp.name, parseFloat(pp.price)]
-          );
-        }
+        // UPDATE on server
+        await serverUpdateProduct(parseInt(editId), {
+          categoryId: selectedCat?.id ?? null,
+          name: itemName.trim(),
+          description: description.trim() || null,
+          imageUrl: imageUri ?? null,
+          price: basePrice,
+          isAvailable: true,
+          portions: portionsPayload,
+        });
+        // Refresh local from server
+        await pullAllFromServer(Number(session?.shop?.id ?? 1));
         Alert.alert("Updated", `"${itemName}" has been updated!`, [
           { text: "OK", onPress: () => router.back() },
         ]);
       } else {
-        // INSERT new product
+        // INSERT on server
         const shopId = Number(session?.shop?.id ?? 1);
-        db.runSync(
-          `INSERT INTO products (shop_id, category_id, unit_id, name, description, image_url, price, is_available, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-          [shopId, selectedCat?.id ?? null, selectedUnit?.id ?? null,
-           itemName.trim(), description.trim() || null, imageUri ?? null, basePrice, ts]
-        );
-        const prod = db.getFirstSync(
-          "SELECT id FROM products ORDER BY id DESC LIMIT 1"
-        ) as { id: number } | null;
-        if (prod && portionPrices.length > 0) {
-          for (const pp of portionPrices) {
-            db.runSync(
-              "INSERT INTO portions (product_id, name, price) VALUES (?, ?, ?)",
-              [prod.id, pp.name, parseFloat(pp.price)]
-            );
-          }
-        }
+        await serverCreateProduct({
+          shopId,
+          categoryId: selectedCat?.id ?? null,
+          name: itemName.trim(),
+          description: description.trim() || null,
+          imageUrl: imageUri ?? null,
+          price: basePrice,
+          portions: portionsPayload,
+        });
+        // Refresh local from server
+        await pullAllFromServer(shopId);
         Alert.alert("Item Added", `"${itemName}" has been saved!`, [
           { text: "OK", onPress: () => router.back() },
         ]);

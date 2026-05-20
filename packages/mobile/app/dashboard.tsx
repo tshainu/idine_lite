@@ -340,20 +340,22 @@ export default function DashboardScreen() {
         const TcpSocket = require("react-native-tcp-socket");
         const online = await new Promise<boolean>((resolve) => {
           let done = false;
+          let client: any = null;
           const finish = (result: boolean) => {
             if (done) return;
             done = true;
-            try { client.destroy(); } catch {}
+            clearTimeout(timer);
+            try { if (client) client.destroy(); } catch {}
             resolve(result);
           };
           const timer = setTimeout(() => finish(false), 5000);
-          const client = TcpSocket.createConnection(
+          client = TcpSocket.createConnection(
             { host: ip, port: parseInt(port || "9100"), timeout: 5000 },
-            () => { clearTimeout(timer); finish(true); }
+            () => finish(true)
           );
-          client.on("connect", () => { clearTimeout(timer); finish(true); });
-          client.on("error", () => { clearTimeout(timer); finish(false); });
-          client.on("timeout", () => { clearTimeout(timer); finish(false); });
+          client.on("connect", () => finish(true));
+          client.on("error", () => finish(false));
+          client.on("timeout", () => finish(false));
         });
         setPrinterOnline(online);
       } else {

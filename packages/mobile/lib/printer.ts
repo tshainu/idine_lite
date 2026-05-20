@@ -27,6 +27,7 @@ export function buildReceiptEsc(
     shopName: string;
     shopAddress?: string;
     shopPhone?: string;
+    headerImage?: string;  // base64 data URL — if present, skip text header block
     billNo: number;
     date: string;
     time: string;
@@ -50,23 +51,29 @@ export function buildReceiptEsc(
     "\x1B\x40" +          // init printer
     "\x1B\x61\x01";       // center
 
-  // ── Shop name & contact ──
-  // Shop name — always double width + double height
-  esc +=
-    "\x1B\x21\x30" +    // double width + double height
-    `${data.shopName}\n` +
-    "\x1B\x21\x00";
-  if (data.shopAddress) esc += `${data.shopAddress}\n`;
-  if (data.shopPhone)   esc += `${data.shopPhone}\n`;
+  // ── Shop header ──
+  if (data.headerImage) {
+    // Header image uploaded — skip text header, just print a divider
+    esc += div;
+  } else {
+    // Text header — shop name double width+height, then address/phone
+    esc +=
+      "\x1B\x21\x30" +    // double width + double height
+      `${data.shopName}\n` +
+      "\x1B\x21\x00";
+    if (data.shopAddress) esc += `${data.shopAddress}\n`;
+    if (data.shopPhone)   esc += `${data.shopPhone}\n`;
+    esc += div;
+  }
 
-  esc += div;
-
-  // ── ORDER # + order type — single line, double height (18pt) ──
+  // ── ORDER # + order type — double height (~18pt) + bold ──
   const orderTypeLabel = data.orderType === "takeaway" ? "Take Away" : "Dine In";
   esc +=
+    "\x1B\x45\x01" +    // bold on
     "\x1B\x21\x10" +    // double height only (~18pt)
     `ORDER # ${String(data.billNo).padStart(3, "0")}  (${orderTypeLabel})\n` +
-    "\x1B\x21\x00";
+    "\x1B\x21\x00" +    // normal size
+    "\x1B\x45\x00";     // bold off
 
   esc += div;
 
@@ -80,8 +87,8 @@ export function buildReceiptEsc(
 
   // ── Items table header ──
   if (is80) {
-    // match fixed cols: qty(3) price(10) amt(10) = 23, pad left for name area
-    const hdrRight = `${"QTY".padStart(3)}${"PRICE".padStart(10)}${"AMT".padStart(10)}`;
+    // fixed cols: qty(3) price(9) amt(9) = 21, prefix "#  " = 3, name flex
+    const hdrRight = `${"QTY".padStart(3)}${"PRICE".padStart(9)}${"AMT".padStart(9)}`;
     const hdrLeft  = `#  ITEM`;
     const hdrGap   = Math.max(1, W - hdrLeft.length - hdrRight.length);
     esc += hdrLeft + " ".repeat(hdrGap) + hdrRight + "\n" + div;
@@ -93,23 +100,25 @@ export function buildReceiptEsc(
   data.items.forEach((it, i) => {
     const idx = `${i + 1}`;
     if (is80) {
-      // 80mm fixed columns: #(3) | name+portion(flex) | qty(4) | price(10) | amt(10)
+      // 80mm fixed columns: prefix(3) | name(flex) | qty(3) | price(9) | amt(9) = total 48
       const ptn80 = it.portionName ? ` (${it.portionName.slice(0, 3)})` : "";
       const priceStr = it.price != null ? `Rs.${fmt(it.price)}` : "";
-      const qtyCol  = String(it.qty).padStart(3);
-      const priceCol = priceStr.padStart(10);
-      const amtCol   = `Rs.${fmt(it.amt)}`.padStart(10);
-      const rightFixed = `${qtyCol}${priceCol}${amtCol}`;
-      const nameMaxLen = W - 3 - rightFixed.length - 1; // 3 = "##  " prefix max
+      const qtyCol   = String(it.qty).padStart(3);
+      const priceCol = priceStr.padStart(9);
+      const amtCol   = `Rs.${fmt(it.amt)}`.padStart(9);
+      const rightFixed = `${qtyCol}${priceCol}${amtCol}`;  // 21 chars
+      const PREFIX = 3; // "# " = index left-justified in 2 + 1 space
+      const nameMaxLen = W - PREFIX - rightFixed.length;   // 48 - 3 - 21 = 24
       const fullName = `${it.name}${ptn80}`;
+      const idxStr = idx.padEnd(2);  // "1 ", "2 ", ... "10" etc
       // wrap long names
       if (fullName.length <= nameMaxLen) {
-        esc += `${idx.padEnd(2)}  ${fullName.padEnd(nameMaxLen)} ${rightFixed}\n`;
+        esc += `${idxStr} ${fullName.padEnd(nameMaxLen)}${rightFixed}\n`;
       } else {
         const line1 = fullName.slice(0, nameMaxLen);
         const line2 = fullName.slice(nameMaxLen);
-        esc += `${idx.padEnd(2)}  ${line1.padEnd(nameMaxLen)} ${rightFixed}\n`;
-        esc += `    ${line2}\n`;
+        esc += `${idxStr} ${line1.padEnd(nameMaxLen)}${rightFixed}\n`;
+        esc += `   ${line2}\n`;
       }
     } else {
       // 58mm: wrap item name at 15 chars, full name + portion, no Rs. on amt
@@ -259,30 +268,35 @@ export function buildKotEsc(
 export async function printWifi(ip: string, port: number, escposData: string): Promise<void> {
   if (Platform.OS === "web") throw new Error("WiFi printing not available on web.");
 
+  const { NativeModules } = require("react-native");
+  if (!NativeModules.TcpSockets) {
+    throw new Error("WiFi printing requires a compiled build. Not supported in Expo Go.");
+  }
+
   const TcpSocket = require("react-native-tcp-socket");
 
   return new Promise<void>((resolve, reject) => {
     let settled = false;
+    let client: any = null;
     const done = (err?: any) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      try { if (client) client.destroy(); } catch {}
       if (err) reject(err); else resolve();
     };
 
-    const client = TcpSocket.createConnection({ host: ip, port }, () => {
+    const timer = setTimeout(() => {
+      done(new Error("Connection timed out after 8s"));
+    }, 8000);
+
+    client = TcpSocket.createConnection({ host: ip, port }, () => {
       client.write(escposData, "binary", (err: any) => {
-        client.destroy();
         done(err);
       });
     });
-    client.on("error", (err: any) => { client.destroy(); done(err); });
+    client.on("error", (err: any) => done(err));
     client.on("close", () => done());
-
-    const timer = setTimeout(() => {
-      client.destroy();
-      done(new Error("Connection timed out after 8s"));
-    }, 8000);
   });
 }
 
@@ -302,6 +316,7 @@ export async function printBluetooth(address: string, escposData: string): Promi
   } catch { /* ignore */ }
 
   const dev = await RNBt.connectToDevice(address);
+  if (!dev) throw new Error("Bluetooth device connection returned null.");
   try {
     await dev.write(escposData, "binary");
     await new Promise(r => setTimeout(r, 500));

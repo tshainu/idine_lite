@@ -57,15 +57,27 @@ export const products = new Hono()
     const [product] = await db
       .update(schema.products)
       .set({
-        categoryId: body.categoryId,
+        categoryId: body.categoryId ?? null,
         name: body.name,
+        description: body.description ?? null,
         price: body.price,
-        imageUrl: body.imageUrl,
+        imageUrl: body.imageUrl ?? null,
         isAvailable: body.isAvailable,
         updatedAt: new Date(),
       })
       .where(eq(schema.products.id, id))
       .returning();
+
+    // Replace portions if provided
+    if (body.portions && Array.isArray(body.portions)) {
+      await db.update(schema.portions).set({ deletedAt: new Date() }).where(eq(schema.portions.productId, id));
+      if (body.portions.length > 0) {
+        await db.insert(schema.portions).values(
+          body.portions.map((p: any) => ({ productId: id, name: p.name, price: p.price }))
+        );
+      }
+    }
+
     return c.json({ product }, 200);
   })
   .delete("/:id", async (c) => {

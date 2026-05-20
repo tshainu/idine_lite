@@ -46,6 +46,8 @@ export const adminApi = {
     delete: (id: number) => request(`/shops/${id}`, { method: "DELETE" }),
     suspend: (id: number, suspend: boolean, reason?: string) =>
       request(`/shops/${id}/suspend`, { method: "PATCH", body: JSON.stringify({ suspend, reason }) }),
+    uploadReceiptHeader: (id: number, image: string | null) =>
+      request(`/shops/${id}/receipt-header`, { method: "PATCH", body: JSON.stringify({ image }) }),
   },
 
   users: {

@@ -15,6 +15,7 @@ import { getSession } from "../lib/auth";
 import { store } from "../lib/store";
 import * as Crypto from "expo-crypto";
 import { printWifi, printBluetooth, buildReceiptEsc, buildKotEsc, type PaperSize } from "../lib/printer";
+import { serverCreateOrder } from "../lib/serverApi";
 
 interface Category { id: number; name: string; }
 interface Product { id: number; name: string; price: number; category_id: number; image_url?: string; description?: string; portions: Portion[]; }
@@ -259,6 +260,7 @@ export default function BillingScreen() {
   const [wifiPrinterPort, setWifiPrinterPort] = useState("9100");
   const [paperSize, setPaperSize] = useState<PaperSize>("58");
   const [receiptFooter, setReceiptFooter] = useState("Thank you! Come again");
+  const [receiptHeaderImage, setReceiptHeaderImage] = useState<string | null>(null);
   const [kotPrinterEnabled, setKotPrinterEnabled] = useState(false);
   const [kotPrinterIp, setKotPrinterIp] = useState("");
   const [kotPrinterPort, setKotPrinterPort] = useState("9100");
@@ -299,7 +301,7 @@ export default function BillingScreen() {
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway">("dine-in");
   const [receiptData, setReceiptData] = useState<{
     billNo: number; date: string; time: string;
-    shopName: string; shopAddress: string; shopPhone: string;
+    shopName: string; shopAddress?: string; shopPhone?: string; headerImage?: string;
     cashier: string; orderType: "dine-in" | "takeaway";
     items: { name: string; portionName?: string; qty: number; price: number; amt: number }[];
     subtotal: number; discount: number; total: number; paid: number; balance: number;
@@ -333,7 +335,8 @@ export default function BillingScreen() {
       store.getKotPrinterEnabled(),
       store.getKotPrinterIp(),
       store.getKotPrinterPort(),
-    ]).then(([ptype, addr, ip, port, paper, footer, kotEnabled, kotIp, kotPort]) => {
+      store.getReceiptHeaderImage(),
+    ]).then(([ptype, addr, ip, port, paper, footer, kotEnabled, kotIp, kotPort, hdrImg]) => {
       setPrinterType(ptype);
       setPrinterAddr(addr ?? "");
       setWifiPrinterIp(ip);
@@ -343,6 +346,7 @@ export default function BillingScreen() {
       setKotPrinterEnabled(kotEnabled);
       setKotPrinterIp(kotIp);
       setKotPrinterPort(kotPort);
+      setReceiptHeaderImage(hdrImg);
     });
   }, []);
 
@@ -359,7 +363,8 @@ export default function BillingScreen() {
       store.getKotPrinterEnabled(),
       store.getKotPrinterIp(),
       store.getKotPrinterPort(),
-    ]).then(([ptype, addr, ip, port, paper, footer, kotEnabled, kotIp, kotPort]) => {
+      store.getReceiptHeaderImage(),
+    ]).then(([ptype, addr, ip, port, paper, footer, kotEnabled, kotIp, kotPort, hdrImg]) => {
       setPrinterType(ptype);
       setPrinterAddr(addr ?? "");
       setWifiPrinterIp(ip);
@@ -369,6 +374,7 @@ export default function BillingScreen() {
       setKotPrinterEnabled(kotEnabled);
       setKotPrinterIp(kotIp);
       setKotPrinterPort(kotPort);
+      setReceiptHeaderImage(hdrImg);
     });
   }, []));
 
@@ -553,12 +559,40 @@ export default function BillingScreen() {
       [localId, session?.shop?.id ?? 1, session?.user?.id ?? 1, status, subtotal, discount, total, "cash", orderType, status === "kot" ? 1 : 0, ts, ts]
     );
     const orderId = (db.getFirstSync("SELECT last_insert_rowid() as id") as any)?.id;
+    if (!orderId) {
+      console.warn("saveOrder: last_insert_rowid() returned null — order items skipped");
+      return null;
+    }
     for (const item of cart) {
       db.runSync(
         `INSERT INTO order_items (order_id, product_id, portion_id, product_name, portion_name, qty, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [orderId, item.productId, item.portionId ?? null, item.productName, item.portionName ?? null, item.qty, item.unitPrice, item.qty * item.unitPrice]
       );
     }
+
+    // Push to server (best-effort, non-blocking)
+    serverCreateOrder({
+      localId,
+      shopId: session?.shop?.id ?? 1,
+      userId: session?.user?.id ?? null,
+      status,
+      subtotal,
+      discount,
+      total,
+      paymentMethod: "cash",
+      orderType,
+      kotPrinted: status === "kot",
+      receiptPrinted: status === "billed",
+      items: cart.map((item) => ({
+        productId: item.productId ?? null,
+        portionId: item.portionId ?? null,
+        productName: item.productName,
+        portionName: item.portionName ?? null,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+      })),
+    }).catch(() => {}); // silent fail
+
     return orderId;
   };
 
@@ -590,8 +624,9 @@ export default function BillingScreen() {
       date: `${dd}.${mm}.${yyyy}`,
       time: `${hh}:${min}`,
       shopName: session?.shop?.name ?? "iDine Lite",
-      shopAddress: (session?.shop as any)?.address || "Chemani road, Nallur, Jaffna",
-      shopPhone: session?.shop?.phone || "0711336666",
+      shopAddress: (session?.shop as any)?.address ?? undefined,
+      shopPhone: session?.shop?.phone ?? undefined,
+      headerImage: receiptHeaderImage ?? undefined,
       cashier: session?.user?.username ?? "-",
       orderType,
       items: snapCart,
@@ -627,6 +662,7 @@ export default function BillingScreen() {
       shopName: data.shopName,
       shopAddress: data.shopAddress,
       shopPhone: data.shopPhone,
+      headerImage: data.headerImage,
       billNo: data.billNo,
       date: data.date,
       time: data.time,
@@ -663,6 +699,7 @@ export default function BillingScreen() {
       shopName: data.shopName,
       shopAddress: data.shopAddress,
       shopPhone: data.shopPhone,
+      headerImage: data.headerImage,
       billNo: data.billNo,
       date: data.date,
       time: data.time,
@@ -691,15 +728,11 @@ export default function BillingScreen() {
       cashier: data.cashier,
       dateTime: `${dd2}.${mm2}.${yyyy2} ${hh2}:${min2}`,
       orderType: data.orderType,
-      items: data.items.map(it => {
-        // item.name may be "ProductName (PortionName)" — split it back
-        const match = it.name.match(/^(.+?)\s*\((.+)\)$/);
-        return {
-          name: match ? match[1] : it.name,
-          portionName: match ? match[2] : undefined,
-          qty: it.qty,
-        };
-      }),
+      items: data.items.map(it => ({
+        name: it.name,
+        portionName: it.portionName,
+        qty: it.qty,
+      })),
     });
 
     try {
@@ -1411,8 +1444,9 @@ export default function BillingScreen() {
                         const subtotal = order.total + order.discount;
                         const esc = buildReceiptEsc(paperSize, {
                           shopName: session?.shop?.name ?? "iDine Lite",
-                          shopAddress: (session?.shop as any)?.address || "Chemani road, Nallur, Jaffna",
-                          shopPhone: session?.shop?.phone || "0711336666",
+                          shopAddress: (session?.shop as any)?.address ?? undefined,
+                          shopPhone: session?.shop?.phone ?? undefined,
+                          headerImage: receiptHeaderImage ?? undefined,
                           billNo: order.id,
                           date: `${dd}.${mm}.${yyyy}`,
                           time: `${hh}:${min}`,

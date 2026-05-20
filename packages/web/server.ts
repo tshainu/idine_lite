@@ -9,6 +9,8 @@ import { sync } from "./src/api/routes/sync";
 import { users } from "./src/api/routes/users";
 import { print } from "./src/api/routes/print";
 import { admin } from "./src/api/routes/admin";
+import { units } from "./src/api/routes/units";
+import { portionTemplates } from "./src/api/routes/portionTemplates";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { db } from "./src/api/database";
 import { sql } from "drizzle-orm";
@@ -60,6 +62,8 @@ const app = new Hono()
   .route("/api/users", users)
   .route("/api/print", print)
   .route("/api/admin", admin)
+  .route("/api/units", units)
+  .route("/api/portion-templates", portionTemplates)
   .get("/api/health", (c) => c.json({ status: "ok", service: "iDine Lite API" }));
 
 // Serve static files from dist/ — Bun native file serving

@@ -9,6 +9,7 @@ import { List, Pencil, Trash } from "phosphor-react-native";
 import { Colors } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
+import { serverCreatePortionTemplate, serverUpdatePortionTemplate, serverDeletePortionTemplate } from "../lib/serverApi";
 
 interface Portion { id: number; name: string; }
 
@@ -106,20 +107,31 @@ export default function PortionsScreen() {
     } catch { setPortions([]); }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) { Alert.alert("Enter portion name"); return; }
-    if (Platform.OS !== "web") {
-      if (editingId) {
-        db.runSync("UPDATE portions SET name = ? WHERE id = ?", [name.trim(), editingId]);
-      } else {
-        db.runSync("INSERT INTO portions (name, product_id, price) VALUES (?, 0, 0)", [name.trim()]);
-      }
-    } else {
+    if (Platform.OS === "web") {
       if (editingId) {
         setPortions((p) => p.map((x) => x.id === editingId ? { ...x, name: name.trim() } : x));
       } else {
         setPortions((p) => [...p, { id: Date.now(), name: name.trim() }]);
       }
+      setName(""); setEditingId(null);
+      return;
+    }
+    try {
+      if (editingId) {
+        await serverUpdatePortionTemplate(editingId, name.trim());
+        db.runSync("UPDATE portions SET name = ? WHERE id = ? AND product_id = 0", [name.trim(), editingId]);
+      } else {
+        const created = await serverCreatePortionTemplate(session?.shop?.id ?? 1, name.trim());
+        db.runSync(
+          "INSERT OR REPLACE INTO portions (id, product_id, name, price) VALUES (?, 0, ?, 0)",
+          [created.id, name.trim()]
+        );
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not save portion");
+      return;
     }
     setName(""); setEditingId(null); loadData();
   };
@@ -128,8 +140,14 @@ export default function PortionsScreen() {
     if (Platform.OS === "web") { setPortions((p) => p.filter((x) => x.id !== id)); return; }
     Alert.alert("Delete Portion", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => {
-        db.runSync("UPDATE portions SET deleted_at = ? WHERE id = ?", [Date.now(), id]);
+      { text: "Delete", style: "destructive", onPress: async () => {
+        try {
+          await serverDeletePortionTemplate(id);
+        } catch (e: any) {
+          Alert.alert("Error", e?.message ?? "Could not delete");
+          return;
+        }
+        db.runSync("UPDATE portions SET deleted_at = ? WHERE id = ? AND product_id = 0", [Date.now(), id]);
         loadData();
       }},
     ]);

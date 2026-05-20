@@ -9,6 +9,7 @@ import { List, FloppyDisk, X } from "phosphor-react-native";
 import { Colors, Spacing, Radius } from "../lib/theme";
 import db from "../lib/database";
 import { getSession } from "../lib/auth";
+import { serverCreateUnit, serverUpdateUnit, serverDeleteUnit } from "../lib/serverApi";
 
 interface Unit { id: number; name: string; abbreviation?: string; }
 
@@ -122,7 +123,7 @@ export default function UnitsScreen() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) { Alert.alert("Enter unit name"); return; }
     if (Platform.OS === "web") {
@@ -131,20 +132,22 @@ export default function UnitsScreen() {
     }
     try {
       if (editId !== null) {
+        await serverUpdateUnit(editId, trimmed, abbr.trim() || undefined);
         db.runSync(
           "UPDATE units SET name=?, abbreviation=?, updated_at=? WHERE id=?",
           [trimmed, abbr.trim() || null, Date.now(), editId]
         );
       } else {
+        const created = await serverCreateUnit(session?.shop?.id ?? 1, trimmed, abbr.trim() || undefined);
         db.runSync(
-          "INSERT INTO units (name, abbreviation, created_at, updated_at) VALUES (?, ?, ?, ?)",
-          [trimmed, abbr.trim() || null, Date.now(), Date.now()]
+          "INSERT OR REPLACE INTO units (id, shop_id, name, abbreviation, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+          [created.id, session?.shop?.id ?? 1, trimmed, abbr.trim() || null, Date.now(), Date.now()]
         );
       }
       setName(""); setAbbr(""); setEditId(null);
       loadUnits();
-    } catch (e) {
-      Alert.alert("Error", String(e));
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? String(e));
     }
   };
 
@@ -152,8 +155,14 @@ export default function UnitsScreen() {
     Alert.alert("Delete Unit", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Delete", style: "destructive", onPress: () => {
+        text: "Delete", style: "destructive", onPress: async () => {
           if (Platform.OS === "web") { Alert.alert("Not available on web"); return; }
+          try {
+            await serverDeleteUnit(id);
+          } catch (e: any) {
+            Alert.alert("Error", e?.message ?? "Could not delete");
+            return;
+          }
           db.runSync("UPDATE units SET deleted_at=? WHERE id=?", [Date.now(), id]);
           loadUnits();
         },

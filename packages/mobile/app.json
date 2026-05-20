@@ -19,9 +19,9 @@
       ]
     },
     "extra": {
-      "apiUrl": "https://j7j5e2adzj0r7hr6tyiah-preview-4200.runable.site",
+      "apiUrl": "https://idinelite-production.up.railway.app",
       "eas": {
-        "projectId": "7ae492ec-4885-485a-bf0b-52c6b9534276"
+        "projectId": "101e6ca7-5c49-48d7-8430-83c1d0fae8b8"
       },
       "router": {}
     },
@@ -57,6 +57,6 @@
       "expo-image-picker",
       "expo-document-picker"
     ],
-    "owner": "shainu"
+    "owner": "axshai"
   }
 }

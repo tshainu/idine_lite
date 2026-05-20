@@ -46,18 +46,23 @@ export default function UsersScreen() {
     const apiUrl = await store.getApiUrl();
     const s = await getSession();
     try {
+      let res: Response;
       if (editing) {
-        await fetch(`${apiUrl}/api/users/${editing.id}`, {
+        res = await fetch(`${apiUrl}/api/users/${editing.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${s?.token}` },
           body: JSON.stringify({ role: form.role, password: form.password || undefined }),
         });
       } else {
-        await fetch(`${apiUrl}/api/users`, {
+        res = await fetch(`${apiUrl}/api/users`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${s?.token}` },
           body: JSON.stringify({ shopId: s?.shop.id, username: form.username, password: form.password, role: form.role }),
         });
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error ?? `Server error ${res.status}`);
       }
       setModal(false);
       loadUsers();
