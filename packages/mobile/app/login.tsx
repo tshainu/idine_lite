@@ -10,6 +10,7 @@ import { Eye, EyeSlash } from "phosphor-react-native";
 import { Colors, Spacing, Radius, Typography } from "../lib/theme";
 import { loginUser } from "../lib/auth";
 import { startSyncEngine } from "../lib/sync";
+import { store } from "../lib/store";
 
 export default function LoginScreen() {
   const [shopCode, setShopCode] = useState("");
@@ -26,6 +27,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      const apiUrl = await store.getApiUrl();
       const data = await loginUser(shopCode.trim(), username.trim(), password);
       startSyncEngine();
       if (data.user?.mustChangePassword) {
@@ -34,7 +36,8 @@ export default function LoginScreen() {
         router.replace("/dashboard");
       }
     } catch (e: any) {
-      Alert.alert("Login Failed", e.message ?? "Invalid credentials");
+      const apiUrl = await store.getApiUrl();
+      Alert.alert("Login Failed", `${e.message ?? "Invalid credentials"}\n\nAPI: ${apiUrl}`);
     } finally {
       setLoading(false);
     }
