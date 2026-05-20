@@ -56,8 +56,7 @@
         }
       ],
       "expo-image-picker",
-      "expo-document-picker",
-      "./plugins/withCleartextTraffic.cjs"
+      "expo-document-picker"
     ],
     "owner": "axshai"
   }
