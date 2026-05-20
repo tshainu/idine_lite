@@ -61,7 +61,12 @@ export const store = {
   },
   async getApiUrl(): Promise<string> {
     const val = await AsyncStorage.getItem(KEYS.API_URL);
-    return val ?? "http://69.169.97.195";
+    // Clear stale Railway/old URLs and force VPS
+    if (!val || val.includes("railway.app") || val.includes("localhost")) {
+      await AsyncStorage.setItem(KEYS.API_URL, "http://69.169.97.195");
+      return "http://69.169.97.195";
+    }
+    return val;
   },
   async setApiUrl(url: string) {
     return AsyncStorage.setItem(KEYS.API_URL, url);
