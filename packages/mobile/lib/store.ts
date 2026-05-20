@@ -61,7 +61,7 @@ export const store = {
   },
   async getApiUrl(): Promise<string> {
     const val = await AsyncStorage.getItem(KEYS.API_URL);
-    return val ?? "https://idinelite-production.up.railway.app";
+    return val ?? "http://69.169.97.195";
   },
   async setApiUrl(url: string) {
     return AsyncStorage.setItem(KEYS.API_URL, url);
