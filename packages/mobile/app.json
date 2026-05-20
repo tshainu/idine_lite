@@ -3,7 +3,8 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.idinelite_r7k2.runable",
-      "versionCode": 3,
+      "versionCode": 4,
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A73C8"
@@ -19,7 +20,7 @@
       ]
     },
     "extra": {
-      "apiUrl": "https://idinelite-production.up.railway.app",
+      "apiUrl": "http://69.169.97.195",
       "eas": {
         "projectId": "101e6ca7-5c49-48d7-8430-83c1d0fae8b8"
       },
