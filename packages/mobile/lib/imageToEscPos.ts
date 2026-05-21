@@ -232,15 +232,13 @@ export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<s
           encoding: FileSystem.EncodingType.Base64,
         });
         console.log(`[imageToEscPos] read from file ok, len=${b64?.length}`);
-      } catch (fsErr) {
-        console.warn("[imageToEscPos] FileSystem.readAsStringAsync failed:", fsErr);
-        return "";
+      } catch (fsErr: any) {
+        throw new Error(`FileSystem.readAsStringAsync failed: ${fsErr?.message ?? fsErr}`);
       }
     }
 
     if (!b64) {
-      console.warn("[imageToEscPos] no base64 data available, giving up");
-      return "";
+      throw new Error("no base64 data available after manipulateAsync");
     }
 
     // Step 2: decode PNG pixels
@@ -249,8 +247,7 @@ export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<s
 
     const decoded = decodePng(pngBytes);
     if (!decoded) {
-      console.warn("[imageToEscPos] decodePng returned null");
-      return "";
+      throw new Error("decodePng returned null — PNG parse failed");
     }
 
     console.log(`[imageToEscPos] decoded ${decoded.width}x${decoded.height}`);
@@ -258,8 +255,7 @@ export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<s
     // Step 3: 1-bit bitmap
     const pixels = rgbaToBitmap(decoded.data, decoded.width, decoded.height);
     if (!pixels.length) {
-      console.warn("[imageToEscPos] bitmap is empty");
-      return "";
+      throw new Error("rgbaToBitmap returned empty — image has no rows");
     }
 
     // Step 4: build ESC/POS GS v 0 command
@@ -269,6 +265,6 @@ export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<s
 
   } catch (e) {
     console.warn("[imageToEscPos] unexpected error:", e);
-    return "";
+    throw e; // re-throw so caller can show a real error message
   }
 }

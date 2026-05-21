@@ -383,12 +383,13 @@ export default function AddItemScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, aspect: [1, 1], quality: 0.8,
+        allowsEditing: false,
+        quality: 0.8,
       });
       if (!result.canceled) setImageUri(result.assets[0].uri);
     } catch (e: any) {
       console.warn("[add-item] pickImage error:", e);
-      Alert.alert("Error", `Could not open image library: ${e?.message ?? e}`);
+      Alert.alert("Image Library Error", `${e?.message ?? String(e)}\n\nCode: ${e?.code ?? "none"}\nFull: ${JSON.stringify(e)}`);
     }
   };
 
@@ -401,12 +402,13 @@ export default function AddItemScreen() {
       }
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, aspect: [1, 1], quality: 0.8,
+        allowsEditing: false,
+        quality: 0.8,
       });
       if (!result.canceled) setImageUri(result.assets[0].uri);
     } catch (e: any) {
       console.warn("[add-item] takePhoto error:", e);
-      Alert.alert("Error", `Could not open camera: ${e?.message ?? e}`);
+      Alert.alert("Camera Error", `${e?.message ?? String(e)}\n\nCode: ${e?.code ?? "none"}\nFull: ${JSON.stringify(e)}`);
     }
   };
 
