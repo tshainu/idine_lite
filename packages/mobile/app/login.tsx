@@ -35,7 +35,12 @@ export default function LoginScreen() {
         router.replace("/dashboard");
       }
     } catch (e: any) {
-      Alert.alert("Login Failed", e.message ?? "Invalid credentials");
+      const raw: string = e?.message ?? "";
+      // Strip any IP/URL leaking from network errors
+      const safe = /invalid credentials|wrong|not found|unauthorized|http \d/i.test(raw)
+        ? raw
+        : "Invalid shop code, username, or password.";
+      Alert.alert("Login Failed", safe);
     } finally {
       setLoading(false);
     }
