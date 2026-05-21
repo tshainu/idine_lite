@@ -72,8 +72,8 @@ export const syncWithServer = async (): Promise<{ success: boolean; error?: stri
         const existing = db.getFirstSync("SELECT id FROM products WHERE server_id = ?", [prod.id]);
         if (existing) {
           db.runSync(
-            "UPDATE products SET name = ?, price = ?, description = ?, category_id = ?, is_available = ?, deleted_at = ? WHERE server_id = ?",
-            [prod.name, prod.price, prod.description ?? null, prod.categoryId, prod.isAvailable ? 1 : 0, prod.deletedAt ? new Date(prod.deletedAt).getTime() : null, prod.id]
+            "UPDATE products SET name = ?, price = ?, description = ?, image_url = ?, category_id = ?, is_available = ?, deleted_at = ? WHERE server_id = ?",
+            [prod.name, prod.price, prod.description ?? null, prod.imageUrl ?? null, prod.categoryId, prod.isAvailable ? 1 : 0, prod.deletedAt ? new Date(prod.deletedAt).getTime() : null, prod.id]
           );
         } else {
           db.runSync(
