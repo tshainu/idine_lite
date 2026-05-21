@@ -363,12 +363,20 @@ export default function AddItemScreen() {
 
   const pickImage = async () => {
     try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please allow photo library access in Settings.");
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true, aspect: [1, 1], quality: 0.8,
       });
       if (!result.canceled) setImageUri(result.assets[0].uri);
-    } catch { Alert.alert("Error", "Could not open image library."); }
+    } catch (e) {
+      console.warn("[add-item] pickImage error:", e);
+      Alert.alert("Error", "Could not open image library.");
+    }
   };
 
   const takePhoto = async () => {

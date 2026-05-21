@@ -296,3 +296,30 @@ export async function uploadMenuImage(localUri: string): Promise<string> {
   const data = await uploadRes.json();
   return `${base}${data.url}`;
 }
+
+// ─── Refresh shop info (header image, name, address, phone) ──────────────────
+
+export async function refreshShopInfo(): Promise<void> {
+  try {
+    const base = await getBase();
+    const token = await store.getToken();
+    if (!token) return;
+
+    const res = await fetch(`${base}/api/auth/shop-info`, {
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const shop = data?.shop;
+    if (!shop) return;
+
+    // Update stored header image
+    await store.setReceiptHeaderImage(shop.receiptHeaderImage ?? null);
+    // Update stored shop info
+    await store.setShop(shop);
+    console.log("[serverApi] refreshShopInfo: updated receiptHeaderImage len=", shop.receiptHeaderImage?.length ?? 0);
+  } catch (e) {
+    console.warn("[serverApi] refreshShopInfo failed:", e);
+  }
+}

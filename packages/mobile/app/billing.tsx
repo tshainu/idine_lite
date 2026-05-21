@@ -16,7 +16,7 @@ import { store } from "../lib/store";
 import * as Crypto from "expo-crypto";
 import { printWifi, printBluetooth, buildReceiptEsc, buildKotEsc, type PaperSize } from "../lib/printer";
 import { imageUriToEscPos } from "../lib/imageToEscPos";
-import { serverCreateOrder } from "../lib/serverApi";
+import { serverCreateOrder, refreshShopInfo } from "../lib/serverApi";
 
 interface Category { id: number; name: string; }
 interface Product { id: number; name: string; price: number; category_id: number; image_url?: string; description?: string; portions: Portion[]; }
@@ -354,6 +354,7 @@ export default function BillingScreen() {
   // Reload products + printer settings every time screen comes into focus
   useFocusEffect(useCallback(() => {
     loadData();
+    // Load from local store first (fast), then refresh from server in background
     Promise.all([
       store.getPrinterType(),
       store.getPrinterAddress(),
@@ -377,6 +378,12 @@ export default function BillingScreen() {
       setKotPrinterPort(kotPort);
       setReceiptHeaderImage(hdrImg);
     });
+    // Refresh shop info from server (picks up any new receipt header image)
+    if (Platform.OS !== "web") {
+      refreshShopInfo().then(() => {
+        store.getReceiptHeaderImage().then(img => setReceiptHeaderImage(img));
+      });
+    }
   }, []));
 
   const loadData = () => {
@@ -1257,10 +1264,19 @@ export default function BillingScreen() {
             <>
               <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
 
-                {/* Shop name + address */}
-                <Text style={s.rcShopName}>{receiptData.shopName}</Text>
-                {!!receiptData.shopAddress && <Text style={s.rcShopAddr}>{receiptData.shopAddress}</Text>}
-                {!!receiptData.shopPhone && <Text style={s.rcShopAddr}>{receiptData.shopPhone}</Text>}
+                {/* Receipt header image OR shop name/address */}
+                {receiptData.headerImage ? (
+                  <Image
+                    source={{ uri: receiptData.headerImage }}
+                    style={{ width: "100%", height: 80, resizeMode: "contain", marginBottom: 6 }}
+                  />
+                ) : (
+                  <>
+                    <Text style={s.rcShopName}>{receiptData.shopName}</Text>
+                    {!!receiptData.shopAddress && <Text style={s.rcShopAddr}>{receiptData.shopAddress}</Text>}
+                    {!!receiptData.shopPhone && <Text style={s.rcShopAddr}>{receiptData.shopPhone}</Text>}
+                  </>
+                )}
 
                 <View style={s.rcDash} />
 

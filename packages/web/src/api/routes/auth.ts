@@ -63,6 +63,27 @@ export const auth = new Hono()
 
     return c.json({ shop, user: { id: user.id, username: user.username, role: user.role } }, 201);
   })
+  // Get current shop info (refresh header image etc) using mobile token
+  .get("/shop-info", async (c) => {
+    const authHeader = c.req.header("Authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "").trim();
+    if (!token) return c.json({ error: "Unauthorized" }, 401);
+
+    let shopId: number;
+    try {
+      const decoded = Buffer.from(token, "base64").toString("utf-8");
+      shopId = parseInt(decoded.split(":")[0]);
+    } catch {
+      return c.json({ error: "Invalid token" }, 401);
+    }
+
+    const [shop] = await db.select().from(schema.shops).where(eq(schema.shops.id, shopId));
+    if (!shop) return c.json({ error: "Shop not found" }, 404);
+
+    return c.json({
+      shop: { id: shop.id, name: shop.name, code: shop.code, address: shop.address, phone: shop.phone, receiptHeaderImage: shop.receiptHeaderImage ?? null },
+    }, 200);
+  })
   // Change password
   .post("/change-password", async (c) => {
     const body = await c.req.json();
