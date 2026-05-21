@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   TextInput, Alert, Platform, Image, Modal, KeyboardAvoidingView,
@@ -57,13 +57,26 @@ function DropdownModal({
 }) {
   const [addMode, setAddMode] = useState(false);
   const [newName, setNewName] = useState("");
+  const isSubmitting = useRef(false);
+
+  // Reset add-mode state whenever the modal opens
+  useEffect(() => {
+    if (visible) {
+      setAddMode(false);
+      setNewName("");
+      isSubmitting.current = false;
+    }
+  }, [visible]);
 
   const handleAdd = () => {
-    if (newName.trim() && onAdd) {
-      onAdd(newName.trim());
-      setNewName("");
-      setAddMode(false);
-    }
+    if (!newName.trim() || !onAdd) return;
+    if (isSubmitting.current) return;          // guard double-tap
+    isSubmitting.current = true;
+    onAdd(newName.trim());
+    setNewName("");
+    setAddMode(false);
+    // reset guard after short delay so it doesn't block next open
+    setTimeout(() => { isSubmitting.current = false; }, 1000);
   };
 
   const handleClose = () => {

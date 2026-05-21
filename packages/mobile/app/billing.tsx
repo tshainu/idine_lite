@@ -951,7 +951,7 @@ export default function BillingScreen() {
           ) : cart.map((item, idx) => (
             <TouchableOpacity key={idx} style={s.tableRow} onPress={() => updateQty(idx, 1)} onLongPress={() => updateQty(idx, -1)}>
               <Text style={[s.td, { width: 22, fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{idx + 1}.</Text>
-              <Text style={[s.td, { flex: 1, minHeight: 16 }]} numberOfLines={2} ellipsizeMode="tail">{item.productName}</Text>
+              <Text style={[s.td, { flex: 1, minHeight: 32 }]} numberOfLines={2} ellipsizeMode="tail">{item.productName}</Text>
               <Text style={[s.td, { width: 32, fontSize: 11, minHeight: 16, paddingTop: 1 }]} numberOfLines={1}>{item.portionName ?? "-"}</Text>
               <Text style={[s.td, { width: 30, textAlign: "center", fontWeight: "700", minHeight: 16, paddingTop: 1 }]}>{item.qty}</Text>
               <Text style={[s.td, { width: 52, textAlign: "right", fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{item.unitPrice.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
