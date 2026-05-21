@@ -669,7 +669,13 @@ export default function BillingScreen() {
     // Pre-render header image to ESC/POS raster bytes if available
     let headerEscBytes = "";
     if (data.headerImage) {
-      try { headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch (imgErr) { console.warn("[billing] imageUriToEscPos receipt failed:", imgErr); }
+      try {
+        headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize);
+        if (!headerEscBytes) console.warn("[billing] imageUriToEscPos returned empty for receipt");
+      } catch (imgErr: any) {
+        console.warn("[billing] imageUriToEscPos receipt failed:", imgErr);
+        Alert.alert("Header Image Warning", `Could not render header image: ${imgErr?.message ?? imgErr}. Printing with text header.`);
+      }
     }
 
     const esc = buildReceiptEsc(paperSize, {
@@ -712,7 +718,13 @@ export default function BillingScreen() {
     // Pre-render header image for Bill
     let billHeaderEscBytes = "";
     if (data.headerImage) {
-      try { billHeaderEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch (imgErr) { console.warn("[billing] imageUriToEscPos bill failed:", imgErr); }
+      try {
+        billHeaderEscBytes = await imageUriToEscPos(data.headerImage, paperSize);
+        if (!billHeaderEscBytes) console.warn("[billing] imageUriToEscPos returned empty for bill");
+      } catch (imgErr: any) {
+        console.warn("[billing] imageUriToEscPos bill failed:", imgErr);
+        Alert.alert("Header Image Warning", `Could not render header image: ${imgErr?.message ?? imgErr}. Printing with text header.`);
+      }
     }
 
     // Build Bill ESC
