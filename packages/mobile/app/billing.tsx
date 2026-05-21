@@ -15,6 +15,7 @@ import { getSession } from "../lib/auth";
 import { store } from "../lib/store";
 import * as Crypto from "expo-crypto";
 import { printWifi, printBluetooth, buildReceiptEsc, buildKotEsc, type PaperSize } from "../lib/printer";
+import { imageUriToEscPos } from "../lib/imageToEscPos";
 import { serverCreateOrder } from "../lib/serverApi";
 
 interface Category { id: number; name: string; }
@@ -658,11 +659,18 @@ export default function BillingScreen() {
   const handlePrintReceipt = async (data: typeof receiptData) => {
     if (!data) return;
 
+    // Pre-render header image to ESC/POS raster bytes if available
+    let headerEscBytes = "";
+    if (data.headerImage) {
+      try { headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch { /* fall back to text header */ }
+    }
+
     const esc = buildReceiptEsc(paperSize, {
       shopName: data.shopName,
       shopAddress: data.shopAddress,
       shopPhone: data.shopPhone,
       headerImage: data.headerImage,
+      headerEscBytes: headerEscBytes || undefined,
       billNo: data.billNo,
       date: data.date,
       time: data.time,
@@ -694,12 +702,19 @@ export default function BillingScreen() {
   const handlePrintBillAndKOT = async (data: typeof receiptData) => {
     if (!data) return;
 
+    // Pre-render header image for Bill
+    let billHeaderEscBytes = "";
+    if (data.headerImage) {
+      try { billHeaderEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch { /* ignore */ }
+    }
+
     // Build Bill ESC
     const billEsc = buildReceiptEsc(paperSize, {
       shopName: data.shopName,
       shopAddress: data.shopAddress,
       shopPhone: data.shopPhone,
       headerImage: data.headerImage,
+      headerEscBytes: billHeaderEscBytes || undefined,
       billNo: data.billNo,
       date: data.date,
       time: data.time,
@@ -1442,11 +1457,16 @@ export default function BillingScreen() {
                         const hh = String(now.getHours()).padStart(2,"0");
                         const min = String(now.getMinutes()).padStart(2,"0");
                         const subtotal = order.total + order.discount;
+                        let reprintHeaderEsc = "";
+                        if (receiptHeaderImage) {
+                          try { reprintHeaderEsc = await imageUriToEscPos(receiptHeaderImage, paperSize); } catch { /* ignore */ }
+                        }
                         const esc = buildReceiptEsc(paperSize, {
                           shopName: session?.shop?.name ?? "iDine Lite",
                           shopAddress: (session?.shop as any)?.address ?? undefined,
                           shopPhone: session?.shop?.phone ?? undefined,
                           headerImage: receiptHeaderImage ?? undefined,
+                          headerEscBytes: reprintHeaderEsc || undefined,
                           billNo: order.id,
                           date: `${dd}.${mm}.${yyyy}`,
                           time: `${hh}:${min}`,

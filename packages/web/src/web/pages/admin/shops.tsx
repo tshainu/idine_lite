@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import AdminLayout from "./layout";
 import { adminApi } from "../../lib/admin-api";
@@ -91,6 +91,7 @@ const emptyForm = () => ({
   businessType: "",
   remarks: "",
   adminUsername: "",
+  receiptHeaderImage: null as string | null,
 });
 
 export default function AdminShops() {
@@ -104,6 +105,8 @@ export default function AdminShops() {
   const [createdCreds, setCreatedCreds] = useState<{ username: string; password: string; shopName: string } | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [search, setSearch] = useState("");
+  const headerFileRef = useRef<HTMLInputElement>(null);
+  const [headerImgError, setHeaderImgError] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -124,7 +127,18 @@ export default function AdminShops() {
   function openCreate() {
     setForm(emptyForm());
     setError("");
+    setHeaderImgError("");
     setShowCreate(true);
+  }
+
+  function handleHeaderFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { setHeaderImgError("Image too large — max 500KB."); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setForm(f => ({ ...f, receiptHeaderImage: ev.target?.result as string }));
+    reader.readAsDataURL(file);
+    setHeaderImgError("");
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -384,6 +398,42 @@ export default function AdminShops() {
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-400 resize-none"
               />
             </Field>
+
+            {/* Receipt Header Image */}
+            <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Receipt Header Image <span className="text-xs font-normal text-gray-400">(optional)</span></p>
+                <p className="text-xs text-gray-400 mt-0.5">Replaces shop name, address &amp; phone on printed bills (58mm &amp; 80mm auto-aligned). Max 500KB, PNG or JPG.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-36 h-16 border border-dashed border-gray-300 rounded-lg bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {form.receiptHeaderImage
+                    ? <img src={form.receiptHeaderImage} alt="Header preview" className="max-w-full max-h-full object-contain" />
+                    : <span className="text-xs text-gray-300">No image</span>
+                  }
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => headerFileRef.current?.click()}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-white transition-colors text-gray-700"
+                  >
+                    Choose Image
+                  </button>
+                  {form.receiptHeaderImage && (
+                    <button
+                      type="button"
+                      onClick={() => { setForm(f => ({ ...f, receiptHeaderImage: null })); setHeaderImgError(""); }}
+                      className="px-3 py-1.5 text-sm border border-red-200 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+              {headerImgError && <p className="text-xs text-red-600">{headerImgError}</p>}
+              <input ref={headerFileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleHeaderFileChange} />
+            </div>
 
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">

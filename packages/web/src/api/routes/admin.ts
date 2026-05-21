@@ -142,13 +142,13 @@ export const admin = new Hono()
   })
 
   .post("/shops", requireAdmin, async (c) => {
-    const { name, code, address, phone, ownerName, ownerMobile, businessType, remarks, adminUsername } = await c.req.json();
+    const { name, code, address, phone, ownerName, ownerMobile, businessType, remarks, adminUsername, receiptHeaderImage } = await c.req.json();
     if (!name || !code) return c.json({ error: "name and code required" }, 400);
 
     const existing = await db.select().from(schema.shops).where(eq(schema.shops.code, code));
     if (existing.length > 0) return c.json({ error: "Shop code already exists" }, 409);
 
-    const [shop] = await db.insert(schema.shops).values({ name, code, address, phone, ownerName, ownerMobile, businessType, remarks }).returning();
+    const [shop] = await db.insert(schema.shops).values({ name, code, address, phone, ownerName, ownerMobile, businessType, remarks, receiptHeaderImage: receiptHeaderImage ?? null }).returning();
 
     // Generate password: first 5 chars of a random flower name + 3 random digits
     const flowers = ["jasmine","rose","lily","tulip","daisy","lotus","iris","poppy","orchid","violet","peony","aster"];

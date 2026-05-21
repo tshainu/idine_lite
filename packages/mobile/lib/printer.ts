@@ -20,6 +20,63 @@ function divider(width: number): string {
   return "-".repeat(width) + "\n";
 }
 
+// ── ESC/POS raster image from base64 ─────────────────────────────
+// Converts a base64 data URL to ESC/POS GS v 0 (raster bit image) bytes.
+// `maxWidthPx`: 384 for 58mm @ 203dpi, 576 for 80mm @ 203dpi
+// Returns empty string if image can't be decoded (falls back to text header).
+export function buildImageEsc(base64DataUrl: string, maxWidthPx: number): string {
+  try {
+    // We can only do this at print-time via canvas in the billing screen.
+    // This function is a no-op placeholder — actual raster conversion happens
+    // in buildReceiptEscAsync which accepts a pre-rendered pixel array.
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+// Paper width in dots (203 dpi thermal)
+// 58mm → 384 dots, 80mm → 576 dots
+export function getPaperWidthPx(paper: PaperSize): number {
+  return paper === "80" ? 576 : 384;
+}
+
+// Build GS v 0 ESC/POS raster image command from a 1-bit pixel matrix.
+// pixels: boolean[][] — rows of dots (true = black, false = white)
+// widthPx: actual image width in dots (must be multiple of 8 after padding)
+export function buildGsV0(pixels: boolean[][]): string {
+  if (!pixels.length || !pixels[0].length) return "";
+
+  const heightPx = pixels.length;
+  const rawWidth = pixels[0].length;
+  // ESC/POS requires width to be a multiple of 8
+  const widthBytes = Math.ceil(rawWidth / 8);
+  const widthPx = widthBytes * 8;
+
+  // xL, xH = widthBytes low/high byte; yL, yH = heightPx low/high byte
+  const xL = widthBytes & 0xff;
+  const xH = (widthBytes >> 8) & 0xff;
+  const yL = heightPx & 0xff;
+  const yH = (heightPx >> 8) & 0xff;
+
+  let cmd = "\x1D\x76\x30\x00" + String.fromCharCode(xL, xH, yL, yH);
+
+  for (let row = 0; row < heightPx; row++) {
+    const rowData = pixels[row];
+    for (let byteIdx = 0; byteIdx < widthBytes; byteIdx++) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const col = byteIdx * 8 + bit;
+        const dark = col < rawWidth ? rowData[col] : false;
+        if (dark) byte |= (0x80 >> bit);
+      }
+      cmd += String.fromCharCode(byte);
+    }
+  }
+
+  return cmd;
+}
+
 // ── Build receipt ESC/POS ─────────────────────────────────────────
 export function buildReceiptEsc(
   paper: PaperSize,
@@ -27,7 +84,8 @@ export function buildReceiptEsc(
     shopName: string;
     shopAddress?: string;
     shopPhone?: string;
-    headerImage?: string;  // base64 data URL — if present, skip text header block
+    headerImage?: string;       // base64 data URL — used to indicate header exists
+    headerEscBytes?: string;    // pre-rendered ESC/POS GS v 0 bytes for raster print
     billNo: number;
     date: string;
     time: string;
@@ -52,8 +110,19 @@ export function buildReceiptEsc(
     "\x1B\x61\x01";       // center
 
   // ── Shop header ──
-  if (data.headerImage) {
-    // Header image uploaded — skip text header, just print a divider
+  if (data.headerEscBytes && data.headerEscBytes.length > 0) {
+    // Raster image header — center + print + divider
+    esc += "\x1B\x61\x01";  // center align
+    esc += data.headerEscBytes;
+    esc += "\n" + div;
+  } else if (data.headerImage) {
+    // headerImage set but raster bytes not available — fall back to text
+    esc +=
+      "\x1B\x21\x30" +
+      `${data.shopName}\n` +
+      "\x1B\x21\x00";
+    if (data.shopAddress) esc += `${data.shopAddress}\n`;
+    if (data.shopPhone)   esc += `${data.shopPhone}\n`;
     esc += div;
   } else {
     // Text header — shop name double width+height, then address/phone
