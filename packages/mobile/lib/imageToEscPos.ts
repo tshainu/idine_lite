@@ -10,30 +10,25 @@
  * Strategy:
  *  1. Use expo-image-manipulator to resize the image to fit the paper width,
  *     keeping aspect ratio, and get a base64 PNG.
- *  2. Decode the PNG pixel data using a pure-JS DEFLATE/PNG parser.
+ *  2. Decode the PNG pixel data using a pure-JS DEFLATE/PNG parser (pako).
  *  3. Convert to 1-bit (threshold) and build ESC/POS GS v 0 command.
  */
 
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system";
+// Static import so Metro bundles pako at build time (dynamic require() can fail)
+import * as pako from "pako";
 import { getPaperWidthPx, buildGsV0 } from "./printer";
 import type { PaperSize } from "./printer";
 
-// ── PNG decoder (pure JS) ─────────────────────────────────────────
-// We use a minimal PNG IDAT/IDHR parser to extract RGBA pixel rows.
-// React Native doesn't have a DOM canvas, so we decode raw bytes ourselves.
-
-// Inflate (DEFLATE) using pako — available as a transitive dep via react-native
-let pako: any = null;
-try { pako = require("pako"); } catch { /* not available */ }
+// ── helpers ───────────────────────────────────────────────────────
 
 function readUint32BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0;
 }
 
-// Decode base64 string to Uint8Array
+/** Decode base64 string (with or without data-URL prefix) → Uint8Array */
 function b64ToBytes(b64: string): Uint8Array {
-  // strip data URL prefix if present
   const raw = b64.replace(/^data:[^;]+;base64,/, "");
   const binary = atob(raw);
   const bytes = new Uint8Array(binary.length);
@@ -41,7 +36,7 @@ function b64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-// PNG filter reconstruction
+// PNG filter reconstruction helper
 function paethPredictor(a: number, b: number, c: number): number {
   const p = a + b - c;
   const pa = Math.abs(p - a);
@@ -59,12 +54,17 @@ interface DecodedPng {
   data: Uint8Array;
 }
 
-function decodePng(bytes: Uint8Array): DecodedPng | null {
-  if (!pako) return null;
+// ── PNG decoder ───────────────────────────────────────────────────
 
-  // Check signature
+function decodePng(bytes: Uint8Array): DecodedPng | null {
+  // Verify PNG signature
   const SIG = [137, 80, 78, 71, 13, 10, 26, 10];
-  for (let i = 0; i < 8; i++) if (bytes[i] !== SIG[i]) return null;
+  for (let i = 0; i < 8; i++) {
+    if (bytes[i] !== SIG[i]) {
+      console.warn("[imageToEscPos] decodePng: bad PNG signature at byte", i);
+      return null;
+    }
+  }
 
   let width = 0, height = 0, bitDepth = 0, colorType = 0;
   const idatChunks: Uint8Array[] = [];
@@ -74,13 +74,14 @@ function decodePng(bytes: Uint8Array): DecodedPng | null {
     const len = readUint32BE(bytes, off); off += 4;
     const type = String.fromCharCode(bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]); off += 4;
     const data = bytes.slice(off, off + len); off += len;
-    off += 4; // CRC skip
+    off += 4; // skip CRC
 
     if (type === "IHDR") {
       width = readUint32BE(data, 0);
       height = readUint32BE(data, 4);
       bitDepth = data[8];
       colorType = data[9];
+      console.log(`[imageToEscPos] PNG IHDR: ${width}x${height} depth=${bitDepth} colorType=${colorType}`);
     } else if (type === "IDAT") {
       idatChunks.push(data);
     } else if (type === "IEND") {
@@ -88,7 +89,10 @@ function decodePng(bytes: Uint8Array): DecodedPng | null {
     }
   }
 
-  if (!width || !height) return null;
+  if (!width || !height) {
+    console.warn("[imageToEscPos] decodePng: zero width/height after parsing");
+    return null;
+  }
 
   // Concatenate IDAT chunks and inflate
   const totalLen = idatChunks.reduce((s, c) => s + c.length, 0);
@@ -97,27 +101,31 @@ function decodePng(bytes: Uint8Array): DecodedPng | null {
   for (const chunk of idatChunks) { combined.set(chunk, pos); pos += chunk.length; }
 
   let inflated: Uint8Array;
-  try { inflated = pako.inflate(combined); } catch { return null; }
+  try {
+    inflated = pako.inflate(combined);
+  } catch (e) {
+    console.warn("[imageToEscPos] decodePng: pako.inflate failed:", e);
+    return null;
+  }
 
-  // Determine bytes per pixel
+  // Bytes per pixel based on colorType
   let bpp = 1;
   if (colorType === 2) bpp = 3;       // RGB
   else if (colorType === 4) bpp = 2;  // Grayscale+Alpha
   else if (colorType === 6) bpp = 4;  // RGBA
-  else if (colorType === 3) bpp = 1;  // Indexed (palette) — treat as 1
+  // colorType 0 = grayscale (bpp=1), colorType 3 = indexed (bpp=1)
 
   const stride = width * bpp;
   const rgba = new Uint8Array(width * height * 4);
 
   let infOff = 0;
-  let prev = new Uint8Array(stride); // previous row for filters
+  let prev = new Uint8Array(stride);
 
   for (let row = 0; row < height; row++) {
     const filter = inflated[infOff++];
     const rowBytes = inflated.slice(infOff, infOff + stride);
     infOff += stride;
 
-    // Reconstruct with filter
     const recon = new Uint8Array(stride);
     for (let i = 0; i < stride; i++) {
       const x = rowBytes[i];
@@ -135,11 +143,9 @@ function decodePng(bytes: Uint8Array): DecodedPng | null {
     }
     prev = recon;
 
-    // Write RGBA
     for (let col = 0; col < width; col++) {
       const pxOff = (row * width + col) * 4;
       if (colorType === 0 || colorType === 4) {
-        // Grayscale
         const gray = recon[col * bpp];
         rgba[pxOff] = rgba[pxOff + 1] = rgba[pxOff + 2] = gray;
         rgba[pxOff + 3] = colorType === 4 ? recon[col * bpp + 1] : 255;
@@ -154,7 +160,7 @@ function decodePng(bytes: Uint8Array): DecodedPng | null {
         rgba[pxOff + 2] = recon[col * 4 + 2];
         rgba[pxOff + 3] = recon[col * 4 + 3];
       } else {
-        // Indexed / other — just use first byte as gray
+        // Indexed / other — treat first byte as gray
         const v = recon[col];
         rgba[pxOff] = rgba[pxOff + 1] = rgba[pxOff + 2] = v;
         rgba[pxOff + 3] = 255;
@@ -165,7 +171,9 @@ function decodePng(bytes: Uint8Array): DecodedPng | null {
   return { width, height, data: rgba };
 }
 
-// Convert RGBA pixel array to 1-bit boolean matrix (threshold 128)
+// ── bitmap conversion ─────────────────────────────────────────────
+
+/** Convert RGBA pixel array to 1-bit boolean matrix (true = dark/printed dot) */
 function rgbaToBitmap(rgba: Uint8Array, width: number, height: number): boolean[][] {
   const rows: boolean[][] = [];
   for (let row = 0; row < height; row++) {
@@ -173,8 +181,7 @@ function rgbaToBitmap(rgba: Uint8Array, width: number, height: number): boolean[
     for (let col = 0; col < width; col++) {
       const off = (row * width + col) * 4;
       const r = rgba[off], g = rgba[off + 1], b = rgba[off + 2], a = rgba[off + 3];
-      // Transparent pixels → white (not printed)
-      if (a < 128) { line.push(false); continue; }
+      if (a < 128) { line.push(false); continue; } // transparent → white
       const luma = 0.299 * r + 0.587 * g + 0.114 * b;
       line.push(luma < 128); // dark = printed dot
     }
@@ -183,40 +190,72 @@ function rgbaToBitmap(rgba: Uint8Array, width: number, height: number): boolean[
   return rows;
 }
 
-// ── Main export ───────────────────────────────────────────────────
+// ── main export ───────────────────────────────────────────────────
 
 /**
- * Convert any image URI/base64 to ESC/POS raster bytes for the given paper size.
+ * Convert any image URI / base64 data URL to ESC/POS raster bytes for the given paper size.
  * Returns empty string on failure (caller falls back to text header).
  */
 export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<string> {
   try {
     const paperWidthPx = getPaperWidthPx(paper);
+    console.log(`[imageToEscPos] start uri=${uri.slice(0, 60)}... paper=${paper} targetWidth=${paperWidthPx}`);
 
-    // Step 1: resize image to paper width using expo-image-manipulator
-    // Keep aspect ratio, convert to PNG for reliable decoding
+    // Step 1: resize to paper width and get base64 PNG
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize: { width: paperWidthPx } }],
       { format: ImageManipulator.SaveFormat.PNG, base64: true }
     );
 
-    const b64 = result.base64;
-    if (!b64) return "";
+    console.log(`[imageToEscPos] manipulateAsync done uri=${result.uri} base64len=${result.base64?.length ?? "null"}`);
+
+    // Get base64 — prefer inline result, fallback to reading the saved file
+    let b64: string | null = result.base64 ?? null;
+    if (!b64) {
+      console.warn("[imageToEscPos] result.base64 was null, reading from file:", result.uri);
+      try {
+        b64 = await FileSystem.readAsStringAsync(result.uri, {
+          encoding: "base64" as any,
+        });
+        console.log(`[imageToEscPos] read from file ok, len=${b64?.length}`);
+      } catch (fsErr) {
+        console.warn("[imageToEscPos] FileSystem.readAsStringAsync failed:", fsErr);
+        return "";
+      }
+    }
+
+    if (!b64) {
+      console.warn("[imageToEscPos] no base64 data available, giving up");
+      return "";
+    }
 
     // Step 2: decode PNG pixels
     const pngBytes = b64ToBytes(b64);
-    const decoded = decodePng(pngBytes);
-    if (!decoded) return "";
+    console.log(`[imageToEscPos] pngBytes len=${pngBytes.length}`);
 
-    // Step 3: convert to 1-bit bitmap
+    const decoded = decodePng(pngBytes);
+    if (!decoded) {
+      console.warn("[imageToEscPos] decodePng returned null");
+      return "";
+    }
+
+    console.log(`[imageToEscPos] decoded ${decoded.width}x${decoded.height}`);
+
+    // Step 3: 1-bit bitmap
     const pixels = rgbaToBitmap(decoded.data, decoded.width, decoded.height);
-    if (!pixels.length) return "";
+    if (!pixels.length) {
+      console.warn("[imageToEscPos] bitmap is empty");
+      return "";
+    }
 
     // Step 4: build ESC/POS GS v 0 command
-    return buildGsV0(pixels);
+    const escBytes = buildGsV0(pixels);
+    console.log(`[imageToEscPos] escBytes len=${escBytes.length} ✓`);
+    return escBytes;
+
   } catch (e) {
-    console.warn("[imageToEscPos] failed:", e);
+    console.warn("[imageToEscPos] unexpected error:", e);
     return "";
   }
 }

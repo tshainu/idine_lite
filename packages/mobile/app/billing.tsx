@@ -662,7 +662,7 @@ export default function BillingScreen() {
     // Pre-render header image to ESC/POS raster bytes if available
     let headerEscBytes = "";
     if (data.headerImage) {
-      try { headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch { /* fall back to text header */ }
+      try { headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch (imgErr) { console.warn("[billing] imageUriToEscPos receipt failed:", imgErr); }
     }
 
     const esc = buildReceiptEsc(paperSize, {
@@ -705,7 +705,7 @@ export default function BillingScreen() {
     // Pre-render header image for Bill
     let billHeaderEscBytes = "";
     if (data.headerImage) {
-      try { billHeaderEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch { /* ignore */ }
+      try { billHeaderEscBytes = await imageUriToEscPos(data.headerImage, paperSize); } catch (imgErr) { console.warn("[billing] imageUriToEscPos bill failed:", imgErr); }
     }
 
     // Build Bill ESC
@@ -1459,7 +1459,7 @@ export default function BillingScreen() {
                         const subtotal = order.total + order.discount;
                         let reprintHeaderEsc = "";
                         if (receiptHeaderImage) {
-                          try { reprintHeaderEsc = await imageUriToEscPos(receiptHeaderImage, paperSize); } catch { /* ignore */ }
+                          try { reprintHeaderEsc = await imageUriToEscPos(receiptHeaderImage, paperSize); } catch (imgErr) { console.warn("[billing] imageUriToEscPos reprint failed:", imgErr); }
                         }
                         const esc = buildReceiptEsc(paperSize, {
                           shopName: session?.shop?.name ?? "iDine Lite",
