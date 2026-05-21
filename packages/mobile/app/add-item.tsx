@@ -382,7 +382,7 @@ export default function AddItemScreen() {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"] as any,
         allowsEditing: true, aspect: [1, 1], quality: 0.8,
       });
       if (!result.canceled) setImageUri(result.assets[0].uri);
@@ -394,13 +394,21 @@ export default function AddItemScreen() {
 
   const takePhoto = async () => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") { Alert.alert("Camera permission required"); return; }
+      const permLib = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permCam = await ImagePicker.requestCameraPermissionsAsync();
+      if (permLib.status !== "granted" || permCam.status !== "granted") {
+        Alert.alert("Permission required", "Camera and photo library access are both needed.");
+        return;
+      }
       const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"] as any,
         allowsEditing: true, aspect: [1, 1], quality: 0.8,
       });
       if (!result.canceled) setImageUri(result.assets[0].uri);
-    } catch { Alert.alert("Error", "Could not open camera."); }
+    } catch (e: any) {
+      console.warn("[add-item] takePhoto error:", e);
+      Alert.alert("Error", "Could not open camera.");
+    }
   };
 
   const handleSave = async () => {
