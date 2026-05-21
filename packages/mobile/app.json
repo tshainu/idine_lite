@@ -3,7 +3,7 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.idinelite_r7k2.runable",
-      "versionCode": 6,
+      "versionCode": 7,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -58,7 +58,13 @@
           "fonts": []
         }
       ],
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow iDine Lite to access your photos to add item images.",
+          "cameraPermission": "Allow iDine Lite to use the camera to take item photos."
+        }
+      ],
       "expo-document-picker"
     ],
     "owner": "tshainoo"

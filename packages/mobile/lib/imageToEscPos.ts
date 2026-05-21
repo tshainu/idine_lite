@@ -199,11 +199,24 @@ function rgbaToBitmap(rgba: Uint8Array, width: number, height: number): boolean[
 export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<string> {
   try {
     const paperWidthPx = getPaperWidthPx(paper);
-    console.log(`[imageToEscPos] start uri=${uri.slice(0, 60)}... paper=${paper} targetWidth=${paperWidthPx}`);
+    console.log(`[imageToEscPos] start uri=${uri.slice(0, 80)}... paper=${paper} targetWidth=${paperWidthPx}`);
 
-    // Step 1: resize to paper width and get base64 PNG
+    // Step 1: If uri is a base64 data URL, write it to a temp file first.
+    // manipulateAsync on Android can fail with large base64 data URIs directly.
+    let manipulateUri = uri;
+    if (uri.startsWith("data:")) {
+      const mimeMatch = uri.match(/^data:([^;]+);base64,/);
+      const ext = mimeMatch?.[1]?.includes("png") ? "png" : "jpg";
+      const rawB64 = uri.replace(/^data:[^;]+;base64,/, "");
+      const tmpPath = FileSystem.cacheDirectory + `hdr_tmp_${Date.now()}.${ext}`;
+      await FileSystem.writeAsStringAsync(tmpPath, rawB64, { encoding: FileSystem.EncodingType.Base64 });
+      manipulateUri = tmpPath;
+      console.log(`[imageToEscPos] wrote data URL to temp file: ${tmpPath}`);
+    }
+
+    // Step 2: resize to paper width and get base64 PNG
     const result = await ImageManipulator.manipulateAsync(
-      uri,
+      manipulateUri,
       [{ resize: { width: paperWidthPx } }],
       { format: ImageManipulator.SaveFormat.PNG, base64: true }
     );
@@ -216,7 +229,7 @@ export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<s
       console.warn("[imageToEscPos] result.base64 was null, reading from file:", result.uri);
       try {
         b64 = await FileSystem.readAsStringAsync(result.uri, {
-          encoding: "base64" as any,
+          encoding: FileSystem.EncodingType.Base64,
         });
         console.log(`[imageToEscPos] read from file ok, len=${b64?.length}`);
       } catch (fsErr) {
