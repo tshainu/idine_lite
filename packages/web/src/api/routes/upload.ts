@@ -4,7 +4,7 @@ import path from "path";
 
 export const upload = new Hono();
 
-const UPLOADS_DIR = path.join(import.meta.dir, "../../../../uploads");
+const UPLOADS_DIR = path.join(import.meta.dir, "../../../uploads");
 
 // Ensure uploads directory exists
 if (!existsSync(UPLOADS_DIR)) {
