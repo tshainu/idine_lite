@@ -4,7 +4,6 @@
  * Local SQLite is a read cache — always write to server first, then refresh local.
  */
 import * as ImageManipulator from "expo-image-manipulator";
-import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 import { store } from "./store";
 import db from "./database";
@@ -251,34 +250,15 @@ export async function serverCreateOrder(order: {
  */
 export async function uploadMenuImage(localUri: string): Promise<string> {
   const base = await getBase();
-  const TARGET_SIZE = 50 * 1024; // 50kb
 
-  // Step 1: resize to max 400x400 and compress
-  let quality = 0.8;
-  let result = await ImageManipulator.manipulateAsync(
+  // Resize to max 400x400 at 0.7 quality — well under 50kb for a thumbnail
+  const result = await ImageManipulator.manipulateAsync(
     localUri,
     [{ resize: { width: 400, height: 400 } }],
-    { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
   );
 
-  // Step 2: iteratively reduce quality until ≤50kb
-  // Use FileSystem instead of fetch() — fetch(file://) fails on Android
-  let fileInfo = await FileSystem.getInfoAsync(result.uri, { size: true });
-  let fileSize = (fileInfo as any).size ?? 0;
-
-  while (fileSize > TARGET_SIZE && quality > 0.1) {
-    quality -= 0.1;
-    result = await ImageManipulator.manipulateAsync(
-      localUri,
-      [{ resize: { width: 400, height: 400 } }],
-      { compress: Math.max(quality, 0.1), format: ImageManipulator.SaveFormat.JPEG }
-    );
-    fileInfo = await FileSystem.getInfoAsync(result.uri, { size: true });
-    fileSize = (fileInfo as any).size ?? 0;
-  }
-
-  // Step 3: upload to server — pass the file URI directly in FormData
-  // React Native's fetch handles file:// URIs in FormData bodies natively
+  // Upload — React Native fetch handles file:// URIs inside FormData natively
   const formData = new FormData();
   formData.append("image", {
     uri: result.uri,
