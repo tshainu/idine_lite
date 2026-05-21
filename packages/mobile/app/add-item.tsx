@@ -13,7 +13,7 @@ import { getSession } from "../lib/auth";
 import {
   serverCreateProduct, serverUpdateProduct,
   serverCreateCategory, serverCreatePortionTemplate,
-  pullAllFromServer,
+  pullAllFromServer, uploadMenuImage,
 } from "../lib/serverApi";
 
 // ─── Types ────────────────────────────────────────────────────
@@ -399,13 +399,19 @@ export default function AddItemScreen() {
       const basePrice = portionPrices.length > 0 ? parseFloat(portionPrices[0].price) || 0 : 0;
       const portionsPayload = portionPrices.map((pp) => ({ name: pp.name, price: parseFloat(pp.price) || 0 }));
 
+      // Upload image to server if a new local image was selected
+      let finalImageUrl: string | null = imageUri ?? null;
+      if (imageUri && imageUri.startsWith("file://")) {
+        finalImageUrl = await uploadMenuImage(imageUri);
+      }
+
       if (isEdit && editId) {
         // UPDATE on server
         await serverUpdateProduct(parseInt(editId), {
           categoryId: selectedCat?.id ?? null,
           name: itemName.trim(),
           description: description.trim() || null,
-          imageUrl: imageUri ?? null,
+          imageUrl: finalImageUrl,
           price: basePrice,
           isAvailable: true,
           portions: portionsPayload,
@@ -423,7 +429,7 @@ export default function AddItemScreen() {
           categoryId: selectedCat?.id ?? null,
           name: itemName.trim(),
           description: description.trim() || null,
-          imageUrl: imageUri ?? null,
+          imageUrl: finalImageUrl,
           price: basePrice,
           portions: portionsPayload,
         });

@@ -3,6 +3,7 @@
  * All server communication goes through here.
  * Local SQLite is a read cache — always write to server first, then refresh local.
  */
+import * as ImageManipulator from "expo-image-manipulator";
 import { Platform } from "react-native";
 import { store } from "./store";
 import db from "./database";
@@ -239,4 +240,59 @@ export async function serverCreateOrder(order: {
     console.warn("serverCreateOrder failed:", e);
     return null;
   }
+}
+
+// ─── Image Upload ──────────────────────────────────────────────────────────────
+
+/**
+ * Compress image to ≤50kb then upload to server.
+ * Returns the server URL of the uploaded image.
+ */
+export async function uploadMenuImage(localUri: string): Promise<string> {
+  const base = await getBase();
+  const TARGET_SIZE = 50 * 1024; // 50kb
+
+  // Step 1: resize to max 400x400 and compress
+  let quality = 0.8;
+  let result = await ImageManipulator.manipulateAsync(
+    localUri,
+    [{ resize: { width: 400, height: 400 } }],
+    { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+  );
+
+  // Step 2: iteratively reduce quality until ≤50kb
+  let response = await fetch(result.uri);
+  let blob = await response.blob();
+
+  while (blob.size > TARGET_SIZE && quality > 0.1) {
+    quality -= 0.1;
+    result = await ImageManipulator.manipulateAsync(
+      localUri,
+      [{ resize: { width: 400, height: 400 } }],
+      { compress: Math.max(quality, 0.1), format: ImageManipulator.SaveFormat.JPEG }
+    );
+    response = await fetch(result.uri);
+    blob = await response.blob();
+  }
+
+  // Step 3: upload to server
+  const formData = new FormData();
+  formData.append("image", {
+    uri: result.uri,
+    type: "image/jpeg",
+    name: "menu_image.jpg",
+  } as any);
+
+  const uploadRes = await fetch(`${base}/api/upload/image`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!uploadRes.ok) {
+    const err = await uploadRes.json().catch(() => ({}));
+    throw new Error((err as any)?.error ?? "Image upload failed");
+  }
+
+  const data = await uploadRes.json();
+  return `${base}${data.url}`;
 }

@@ -11,11 +11,12 @@ import { print } from "./src/api/routes/print";
 import { admin } from "./src/api/routes/admin";
 import { units } from "./src/api/routes/units";
 import { portionTemplates } from "./src/api/routes/portionTemplates";
+import { upload } from "./src/api/routes/upload";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { db } from "./src/api/database";
 import { sql } from "drizzle-orm";
 import path from "path";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync } from "fs";
 
 const distDir = path.join(import.meta.dir, "dist");
 
@@ -64,7 +65,21 @@ const app = new Hono()
   .route("/api/admin", admin)
   .route("/api/units", units)
   .route("/api/portion-templates", portionTemplates)
+  .route("/api/upload", upload)
   .get("/api/health", (c) => c.json({ status: "ok", service: "iDine Lite API" }));
+
+const uploadsDir = path.join(import.meta.dir, "uploads");
+if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+
+// Serve uploaded images
+app.get("/uploads/:filename", async (c) => {
+  const filename = c.req.param("filename");
+  const filePath = path.join(uploadsDir, filename);
+  if (!existsSync(filePath)) return c.text("Not found", 404);
+  const ext = path.extname(filename).toLowerCase();
+  const contentType = ext === ".png" ? "image/png" : "image/jpeg";
+  return new Response(Bun.file(filePath), { headers: { "Content-Type": contentType } });
+});
 
 // Serve static files from dist/ — Bun native file serving
 app.get("/*", async (c) => {
