@@ -27,7 +27,6 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const apiUrl = await store.getApiUrl();
       const data = await loginUser(shopCode.trim(), username.trim(), password);
       startSyncEngine();
       if (data.user?.mustChangePassword) {
@@ -36,8 +35,7 @@ export default function LoginScreen() {
         router.replace("/dashboard");
       }
     } catch (e: any) {
-      const apiUrl = await store.getApiUrl();
-      Alert.alert("Login Failed", `${e.message ?? "Invalid credentials"}\n\nAPI: ${apiUrl}`);
+      Alert.alert("Login Failed", e.message ?? "Invalid credentials");
     } finally {
       setLoading(false);
     }
