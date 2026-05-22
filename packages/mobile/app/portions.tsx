@@ -101,7 +101,7 @@ export default function PortionsScreen() {
     if (Platform.OS === "web") { setPortions(DEMO); return; }
     try {
       const rows = db.getAllSync(
-        "SELECT DISTINCT name, MIN(id) as id FROM portions WHERE deleted_at IS NULL AND product_id = 0 GROUP BY name ORDER BY name"
+        "SELECT DISTINCT name, MIN(id) as id FROM portions WHERE deleted_at IS NULL AND product_id = 0 GROUP BY name ORDER BY MIN(id) ASC"
       ) as Portion[];
       setPortions(rows.length > 0 ? rows : []);
     } catch { setPortions([]); }

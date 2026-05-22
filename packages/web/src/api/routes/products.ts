@@ -32,24 +32,30 @@ export const products = new Hono()
     return c.json({ products: result }, 200);
   })
   .post("/", async (c) => {
-    const body = await c.req.json();
-    const [product] = await db.insert(schema.products).values({
-      shopId: body.shopId,
-      categoryId: body.categoryId,
-      name: body.name,
-      price: body.price,
-      imageUrl: body.imageUrl,
-      isAvailable: body.isAvailable ?? true,
-    }).returning();
+    try {
+      const body = await c.req.json();
+      const [product] = await db.insert(schema.products).values({
+        shopId: body.shopId,
+        categoryId: body.categoryId ?? null,
+        name: body.name,
+        description: body.description ?? null,
+        price: body.price ?? 0,
+        imageUrl: body.imageUrl ?? null,
+        isAvailable: body.isAvailable ?? true,
+      }).returning();
 
-    // Insert portions if provided
-    if (body.portions && body.portions.length > 0) {
-      await db.insert(schema.portions).values(
-        body.portions.map((p: any) => ({ productId: product.id, name: p.name, price: p.price }))
-      );
+      // Insert portions if provided
+      if (body.portions && body.portions.length > 0) {
+        await db.insert(schema.portions).values(
+          body.portions.map((p: any) => ({ productId: product.id, name: p.name, price: p.price ?? 0 }))
+        );
+      }
+
+      return c.json({ product }, 201);
+    } catch (e: any) {
+      console.error("POST /products error:", e);
+      return c.json({ error: e?.message ?? "Failed to create product" }, 500);
     }
-
-    return c.json({ product }, 201);
   })
   .put("/:id", async (c) => {
     const id = parseInt(c.req.param("id"));

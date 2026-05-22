@@ -786,7 +786,7 @@ export default function BillingScreen() {
       }
 
       // Small delay so printer finishes the bill before KOT job
-      await new Promise(res => setTimeout(res, 1500));
+      await new Promise(res => setTimeout(res, 1000));
 
       // Print KOT — use dedicated KOT printer if enabled, else same main printer
       if (kotPrinterEnabled && kotPrinterIp) {
