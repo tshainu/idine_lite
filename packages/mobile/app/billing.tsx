@@ -672,7 +672,12 @@ export default function BillingScreen() {
     Alert.alert("DBG: Header Image", `headerImage: ${data.headerImage ? `len=${data.headerImage.length} prefix=${data.headerImage.slice(0,40)}` : "NULL/UNDEFINED"}`);
     if (data.headerImage) {
       try {
-        headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize);
+        Alert.alert("DBG: Step", "calling imageUriToEscPos...");
+        const escResult = await Promise.race([
+          imageUriToEscPos(data.headerImage, paperSize),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error("imageUriToEscPos timed out after 15s")), 15000)),
+        ]);
+        headerEscBytes = escResult as string;
         if (!headerEscBytes) {
           console.warn("[billing] imageUriToEscPos returned empty for receipt");
           Alert.alert("DBG: EscPos", "imageUriToEscPos returned empty string!");
