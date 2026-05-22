@@ -141,6 +141,24 @@ export const initDatabase = async () => {
     try { db.execSync(sql); } catch { /* column already exists */ }
   }
 
+  // ── Deduplicate categories: keep lowest id per (name, shop_id), delete rest ──
+  try {
+    db.execSync(`
+      DELETE FROM categories WHERE id NOT IN (
+        SELECT MIN(id) FROM categories GROUP BY name, shop_id
+      )
+    `);
+  } catch { /* ignore */ }
+
+  // ── Deduplicate products: keep lowest id per (name, shop_id), delete rest ──
+  try {
+    db.execSync(`
+      DELETE FROM products WHERE id NOT IN (
+        SELECT MIN(id) FROM products GROUP BY name, shop_id
+      )
+    `);
+  } catch { /* ignore */ }
+
   // Seed default portion template "Regular" if none exist (runs every init)
   try {
     db.runSync(
