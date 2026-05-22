@@ -3,7 +3,7 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.idinelite_r7k2.runable",
-      "versionCode": 17,
+      "versionCode": 18,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -41,7 +41,7 @@
     },
     "name": "iDine Lite",
     "slug": "idine-lite",
-    "version": "1.0.0",
+    "version": "1.0.18",
     "scheme": "idine-lite",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
