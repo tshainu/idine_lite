@@ -15,7 +15,7 @@
  */
 
 import * as ImageManipulator from "expo-image-manipulator";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 // Static import so Metro bundles pako at build time (dynamic require() can fail)
 import * as pako from "pako";
 import { getPaperWidthPx, buildGsV0 } from "./printer";
