@@ -114,7 +114,7 @@ export function buildReceiptEsc(
     // Raster image header — center + print + divider
     esc += "\x1B\x61\x01";  // center align
     esc += data.headerEscBytes;
-    esc += "\n" + div;
+    esc += div;
   } else if (data.headerImage) {
     // headerImage set but raster bytes not available — fall back to text
     esc +=
