@@ -83,8 +83,8 @@ app.get("/uploads/:filename", async (c) => {
 
 // Serve static files from dist/ — Bun native file serving
 app.get("/*", async (c) => {
-  const url = new URL(c.req.url);
-  let filePath = path.join(distDir, url.pathname);
+  const pathname = c.req.path;
+  let filePath = path.join(distDir, pathname);
 
   // Try exact file first
   if (existsSync(filePath) && !filePath.endsWith("/")) {
