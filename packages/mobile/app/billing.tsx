@@ -785,6 +785,9 @@ export default function BillingScreen() {
         await printBluetooth(printerAddr, billEsc);
       }
 
+      // Small delay so printer finishes the bill before KOT job
+      await new Promise(res => setTimeout(res, 1500));
+
       // Print KOT — use dedicated KOT printer if enabled, else same main printer
       if (kotPrinterEnabled && kotPrinterIp) {
         await printWifi(kotPrinterIp, parseInt(kotPrinterPort || "9100"), kotEsc);
