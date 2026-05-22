@@ -563,9 +563,9 @@ export default function BillingScreen() {
     const localId = Crypto.randomUUID();
     const ts = Date.now();
     db.runSync(
-      `INSERT INTO orders (local_id, shop_id, user_id, status, subtotal, discount, total, payment_method, order_type, kot_printed, synced, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-      [localId, session?.shop?.id ?? 1, session?.user?.id ?? 1, status, subtotal, discount, total, "cash", orderType, status === "kot" ? 1 : 0, ts, ts]
+      `INSERT INTO orders (local_id, shop_id, user_id, cashier_name, status, subtotal, discount, total, payment_method, order_type, kot_printed, synced, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      [localId, session?.shop?.id ?? 1, session?.user?.id ?? 1, session?.user?.username ?? null, status, subtotal, discount, total, "cash", orderType, status === "kot" ? 1 : 0, ts, ts]
     );
     const orderId = (db.getFirstSync("SELECT last_insert_rowid() as id") as any)?.id;
     if (!orderId) {
@@ -1311,7 +1311,7 @@ export default function BillingScreen() {
 
                 {/* Bill No | Date & Time */}
                 <View style={s.rcInfoRow}>
-                  <Text style={s.rcInfoLbl}>Bill No: <Text style={s.rcInfoVal}>{String(receiptData.billNo).padStart(3, "0")}</Text></Text>
+                  <Text style={s.rcInfoLbl}>Bill No: <Text style={s.rcInfoVal}>{String(receiptData.billNo).padStart(3, "0")} ({receiptData.cashier || "admin"})</Text></Text>
                   <Text style={s.rcInfoLbl}>{receiptData.date}  {receiptData.time}</Text>
                 </View>
                 <View style={[s.rcInfoRow, { marginTop: 2 }]}>

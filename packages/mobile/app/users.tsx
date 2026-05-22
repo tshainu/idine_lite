@@ -142,8 +142,17 @@ export default function UsersScreen() {
   const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
-    getSession().then(setSession);
-    loadUsers();
+    getSession().then((s) => {
+      setSession(s);
+      // Block cashier from user management
+      if (s?.user?.role !== "admin") {
+        Alert.alert("Access Denied", "Only admins can manage users.", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+        return;
+      }
+      loadUsers();
+    });
   }, []);
 
   // Search filter

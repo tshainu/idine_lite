@@ -149,8 +149,8 @@ export function buildReceiptEsc(
   // ── Bill info ──
   esc +=
     "\x1B\x61\x00" +      // left align
-    `Bill No: ${String(data.billNo).padStart(3, "0")}` +
-    " ".repeat(Math.max(1, W - `Bill No: ${String(data.billNo).padStart(3, "0")}`.length - `${data.date}  ${data.time}`.length)) +
+    `Bill No: ${String(data.billNo).padStart(3, "0")} (${data.cashier || "admin"})` +
+    " ".repeat(Math.max(1, W - `Bill No: ${String(data.billNo).padStart(3, "0")} (${data.cashier || "admin"})`.length - `${data.date}  ${data.time}`.length)) +
     `${data.date}  ${data.time}\n` +
     div;
 

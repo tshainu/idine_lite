@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput,
+  Platform, TextInput, Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import {
   ArrowLeft, ChartBar, Receipt, TrendUp, CurrencyDollar,
-  ForkKnife, Clock, Table, X, CalendarBlank,
+  ForkKnife, Clock, Table, X, CalendarBlank, User, CaretDown,
 } from "phosphor-react-native";
 import { Colors, Spacing, Radius, Typography } from "../lib/theme";
 import db from "../lib/database";
+import { getSession } from "../lib/auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = "sales" | "topselling" | "category" | "hourly";
@@ -24,6 +25,7 @@ interface Bill {
   order_type: string;
   item_count: number;
   items_summary: string;
+  cashier_name?: string;
 }
 interface TopItem { product_name: string; qty: number; revenue: number; }
 interface CatSales { category: string; revenue: number; qty: number; }
@@ -76,12 +78,37 @@ export default function ReportsScreen() {
   const [customTo, setCustomTo] = useState(toDateStr(new Date()));
   const [customApplied, setCustomApplied] = useState(false);
 
+  // Session / role
+  const [session, setSession] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // User filter (admin only)
+  const [allUsers, setAllUsers] = useState<{ id: number; username: string }[]>([]);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null); // null = all
+  const [userPickerOpen, setUserPickerOpen] = useState(false);
+
   // Data
   const [summary, setSummary] = useState<Summary>({ total: 0, count: 0, avgOrder: 0, dineIn: 0, takeaway: 0 });
   const [bills, setBills] = useState<Bill[]>([]);
   const [topItems, setTopItems] = useState<TopItem[]>([]);
   const [catSales, setCatSales] = useState<CatSales[]>([]);
   const [hourlySales, setHourlySales] = useState<HourSales[]>([]);
+
+  // Load session on mount
+  useEffect(() => {
+    getSession().then((s) => {
+      setSession(s);
+      const admin = s?.user?.role === "admin";
+      setIsAdmin(admin);
+      if (admin && Platform.OS !== "web") {
+        // Load all users for the filter dropdown
+        const users = db.getAllSync(
+          "SELECT id, username FROM users ORDER BY username ASC"
+        ) as { id: number; username: string }[];
+        setAllUsers(users);
+      }
+    });
+  }, []);
 
   const getDateRange = useCallback((): [number, number] => {
     const now = new Date();
@@ -100,15 +127,28 @@ export default function ReportsScreen() {
 
   const loadReport = useCallback(() => {
     if (Platform.OS === "web") return;
+    if (!session) return; // wait for session
     const [from, to] = getDateRange();
+
+    // Determine cashier filter
+    // - cashier: always their own username
+    // - admin: filter by selectedUser if set, otherwise all
+    const cashierFilter = !isAdmin
+      ? session?.user?.username ?? null
+      : selectedUser; // null = all
+
+    const baseWhere = cashierFilter
+      ? `created_at >= ? AND created_at <= ? AND status != 'cancelled' AND cashier_name = ?`
+      : `created_at >= ? AND created_at <= ? AND status != 'cancelled'`;
+    const baseParams: any[] = cashierFilter ? [from, to, cashierFilter] : [from, to];
 
     // Summary
     const s = db.getFirstSync(
       `SELECT COALESCE(SUM(total),0) as total, COUNT(*) as count,
               SUM(CASE WHEN order_type='dine-in' THEN 1 ELSE 0 END) as dineIn,
               SUM(CASE WHEN order_type='takeaway' THEN 1 ELSE 0 END) as takeaway
-       FROM orders WHERE created_at >= ? AND created_at <= ? AND status != 'cancelled'`,
-      [from, to]
+       FROM orders WHERE ${baseWhere}`,
+      baseParams
     ) as any;
     const total = s?.total ?? 0;
     const count = s?.count ?? 0;
@@ -121,14 +161,14 @@ export default function ReportsScreen() {
 
     // Bills detail
     const b = db.getAllSync(
-      `SELECT o.id, o.order_no, o.created_at, o.total, o.order_type,
+      `SELECT o.id, o.order_no, o.created_at, o.total, o.order_type, o.cashier_name,
               COUNT(oi.id) as item_count,
               GROUP_CONCAT(oi.product_name || ' x' || oi.qty, ', ') as items_summary
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id
-       WHERE o.created_at >= ? AND o.created_at <= ? AND o.status != 'cancelled'
+       WHERE o.${baseWhere}
        GROUP BY o.id ORDER BY o.created_at DESC`,
-      [from, to]
+      baseParams
     ) as Bill[];
     setBills(b);
 
@@ -137,9 +177,9 @@ export default function ReportsScreen() {
       `SELECT oi.product_name, SUM(oi.qty) as qty, SUM(oi.line_total) as revenue
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
-       WHERE o.created_at >= ? AND o.created_at <= ? AND o.status != 'cancelled'
+       WHERE o.${baseWhere}
        GROUP BY oi.product_name ORDER BY revenue DESC LIMIT 10`,
-      [from, to]
+      baseParams
     ) as TopItem[];
     setTopItems(top);
 
@@ -151,9 +191,9 @@ export default function ReportsScreen() {
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.id = oi.product_id
        LEFT JOIN categories c ON c.id = p.category_id
-       WHERE o.created_at >= ? AND o.created_at <= ? AND o.status != 'cancelled'
+       WHERE o.${baseWhere}
        GROUP BY c.name ORDER BY revenue DESC`,
-      [from, to]
+      baseParams
     ) as CatSales[];
     setCatSales(cats);
 
@@ -162,16 +202,16 @@ export default function ReportsScreen() {
       `SELECT strftime('%H', created_at/1000, 'unixepoch', 'localtime') as hour,
               SUM(total) as total, COUNT(*) as count
        FROM orders
-       WHERE created_at >= ? AND created_at <= ? AND status != 'cancelled'
+       WHERE ${baseWhere}
        GROUP BY hour ORDER BY hour`,
-      [from, to]
+      baseParams
     ) as any[];
     setHourlySales(
       hourly.map((h) => ({ hour: parseInt(h.hour), total: h.total, count: h.count }))
     );
-  }, [getDateRange]);
+  }, [getDateRange, session, isAdmin, selectedUser]);
 
-  useEffect(() => { loadReport(); }, [loadReport]);
+  useEffect(() => { loadReport(); }, [loadReport, session]);
 
   const periodTabs: { key: Period; label: string }[] = [
     { key: "today", label: "Today" },
@@ -203,9 +243,73 @@ export default function ReportsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <ArrowLeft size={22} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reports</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Reports</Text>
+          {!isAdmin && (
+            <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.6)" }}>
+              My Sales Only
+            </Text>
+          )}
+        </View>
         <Text style={styles.headerPeriod}>{periodLabel}</Text>
       </View>
+
+      {/* Admin: User filter dropdown */}
+      {isAdmin && (
+        <View style={styles.userFilterBar}>
+          <User size={14} color={Colors.textSecondary} />
+          <Text style={styles.userFilterLabel}>Cashier:</Text>
+          <TouchableOpacity
+            style={styles.userFilterBtn}
+            onPress={() => setUserPickerOpen(true)}
+          >
+            <Text style={styles.userFilterBtnText}>
+              {selectedUser ?? "All Users"}
+            </Text>
+            <CaretDown size={12} color={Colors.primary} />
+          </TouchableOpacity>
+          {selectedUser && (
+            <TouchableOpacity
+              style={styles.userFilterClear}
+              onPress={() => { setSelectedUser(null); }}
+            >
+              <X size={13} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* User Picker Modal */}
+      <Modal visible={userPickerOpen} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setUserPickerOpen(false)}
+        >
+          <View style={styles.pickerBox}>
+            <Text style={styles.pickerTitle}>Filter by Cashier</Text>
+            <TouchableOpacity
+              style={[styles.pickerItem, !selectedUser && styles.pickerItemActive]}
+              onPress={() => { setSelectedUser(null); setUserPickerOpen(false); }}
+            >
+              <Text style={[styles.pickerItemText, !selectedUser && styles.pickerItemTextActive]}>All Users</Text>
+              {!selectedUser && <Text style={{ color: Colors.primary }}>✓</Text>}
+            </TouchableOpacity>
+            {allUsers.map((u) => (
+              <TouchableOpacity
+                key={u.id}
+                style={[styles.pickerItem, selectedUser === u.username && styles.pickerItemActive]}
+                onPress={() => { setSelectedUser(u.username); setUserPickerOpen(false); }}
+              >
+                <Text style={[styles.pickerItemText, selectedUser === u.username && styles.pickerItemTextActive]}>
+                  {u.username}
+                </Text>
+                {selectedUser === u.username && <Text style={{ color: Colors.primary }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Period tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll} contentContainerStyle={{ paddingHorizontal: 8 }}>
@@ -322,6 +426,9 @@ export default function ReportsScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.tdCell, { fontWeight: "600" }]}>
                         #{bill.order_no || String(bill.id).padStart(3, "0")}
+                        {bill.cashier_name ? (
+                          <Text style={{ fontWeight: "400", color: Colors.textSecondary }}> ({bill.cashier_name})</Text>
+                        ) : null}
                       </Text>
                       <Text style={[styles.tdCell, { fontSize: 10, color: Colors.textMuted }]}>
                         {fmtDate(bill.created_at)}  {fmtTime(bill.created_at)}
@@ -672,4 +779,43 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: "center", padding: 60, gap: 12 },
   emptyText: { fontSize: 14, color: Colors.textMuted },
+
+  // User filter bar (admin only)
+  userFilterBar: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: Colors.white, paddingHorizontal: 12, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  userFilterLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: "500" },
+  userFilterBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: Colors.primaryLight, borderRadius: Radius.sm,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  userFilterBtnText: { fontSize: 12, color: Colors.primary, fontWeight: "600" },
+  userFilterClear: {
+    padding: 4, backgroundColor: Colors.surface, borderRadius: Radius.sm,
+  },
+
+  // User picker modal
+  pickerOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center", alignItems: "center",
+  },
+  pickerBox: {
+    backgroundColor: Colors.white, borderRadius: Radius.md,
+    width: 260, overflow: "hidden", elevation: 8,
+  },
+  pickerTitle: {
+    fontSize: 14, fontWeight: "700", color: Colors.text,
+    padding: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pickerItem: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: Colors.surface,
+  },
+  pickerItemActive: { backgroundColor: Colors.primaryLight },
+  pickerItemText: { fontSize: 13, color: Colors.text },
+  pickerItemTextActive: { color: Colors.primary, fontWeight: "700" },
 });

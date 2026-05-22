@@ -136,6 +136,7 @@ export const initDatabase = async () => {
     "ALTER TABLE products ADD COLUMN description TEXT",
     "ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'dine-in'",
     "ALTER TABLE units ADD COLUMN shop_id INTEGER",
+    "ALTER TABLE orders ADD COLUMN cashier_name TEXT",
   ];
   for (const sql of migrations) {
     try { db.execSync(sql); } catch { /* column already exists */ }

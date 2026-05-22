@@ -285,28 +285,41 @@ function DrawerMenu({ session, onClose, onNavigate }: {
         {session?.shop?.phone && <Text style={dd.shopInfo}>{session.shop.phone}</Text>}
       </View>
       <ScrollView style={dd.list} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={dd.section} onPress={() => setExpanded(e => e === "items" ? null : "items")}>
-          <Text style={dd.secNum}>1.</Text>
-          <Text style={dd.secLabel}>Item Management</Text>
-          <Text style={dd.chevron}>{expanded === "items" ? "▲" : "▼"}</Text>
-        </TouchableOpacity>
-        {expanded === "items" && (
-          <View style={dd.sub}>
-            {([["Add Item","/add-item"],["List Items","/items"],["Categories","/categories"],["Portions","/portions"],["Units","/units"]] as [string,string][]).map(([l,r]) => (
-              <TouchableOpacity key={r} style={dd.subItem} onPress={() => nav(r)}><Text style={dd.subDot}>›</Text><Text style={dd.subLabel}>{l}</Text></TouchableOpacity>
-            ))}
-          </View>
+        {/* Item Management — admin only */}
+        {session?.user?.role === "admin" && (
+          <>
+            <TouchableOpacity style={dd.section} onPress={() => setExpanded(e => e === "items" ? null : "items")}>
+              <Text style={dd.secNum}>1.</Text>
+              <Text style={dd.secLabel}>Item Management</Text>
+              <Text style={dd.chevron}>{expanded === "items" ? "▲" : "▼"}</Text>
+            </TouchableOpacity>
+            {expanded === "items" && (
+              <View style={dd.sub}>
+                {([["Add Item","/add-item"],["List Items","/items"],["Categories","/categories"],["Portions","/portions"],["Units","/units"]] as [string,string][]).map(([l,r]) => (
+                  <TouchableOpacity key={r} style={dd.subItem} onPress={() => nav(r)}><Text style={dd.subDot}>›</Text><Text style={dd.subLabel}>{l}</Text></TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <View style={dd.divider} />
+          </>
         )}
-        <View style={dd.divider} />
+
         <TouchableOpacity style={[dd.section, { backgroundColor: "#1a6b3c" }]} onPress={() => nav("/billing")}>
           <Text style={[dd.secNum, { color: "#fff" }]}>🧾</Text>
           <Text style={[dd.secLabel, { color: "#fff", fontWeight: "800" }]}>New Bill</Text>
           <Text style={[dd.chevron, { color: "#fff" }]}>›</Text>
         </TouchableOpacity>
         <View style={dd.divider} />
-        <TouchableOpacity style={dd.section} onPress={() => nav("/users")}><Text style={dd.secNum}>2.</Text><Text style={dd.secLabel}>User Management</Text><Text style={dd.chevron}>›</Text></TouchableOpacity>
-        <View style={dd.divider} />
-        <TouchableOpacity style={dd.section} onPress={() => nav("/settings")}><Text style={dd.secNum}>3.</Text><Text style={dd.secLabel}>Settings</Text><Text style={dd.chevron}>›</Text></TouchableOpacity>
+
+        {/* User Management — admin only */}
+        {session?.user?.role === "admin" && (
+          <>
+            <TouchableOpacity style={dd.section} onPress={() => nav("/users")}><Text style={dd.secNum}>2.</Text><Text style={dd.secLabel}>User Management</Text><Text style={dd.chevron}>›</Text></TouchableOpacity>
+            <View style={dd.divider} />
+          </>
+        )}
+
+        <TouchableOpacity style={dd.section} onPress={() => nav("/settings")}><Text style={dd.secNum}>{session?.user?.role === "admin" ? "3." : "2."}</Text><Text style={dd.secLabel}>Settings</Text><Text style={dd.chevron}>›</Text></TouchableOpacity>
       </ScrollView>
       <TouchableOpacity style={dd.closeBtn} onPress={onClose}><Text style={dd.closeTxt}>Close</Text></TouchableOpacity>
     </View>
