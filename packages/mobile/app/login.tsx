@@ -27,7 +27,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const data = await loginUser(shopCode.trim(), username.trim(), password);
+      const data = await loginUser(shopCode.trim(), username.trim(), password.trim());
       startSyncEngine();
       if (data.user?.mustChangePassword) {
         router.replace("/change-password");
@@ -40,7 +40,7 @@ export default function LoginScreen() {
       const safe = /invalid credentials|wrong|not found|unauthorized|http \d/i.test(raw)
         ? raw
         : "Invalid shop code, username, or password.";
-      Alert.alert("Login Failed", safe);
+      Alert.alert("Login Failed", `${safe}\n\n[debug: ${raw}]`);
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import { pullAllFromServer } from "./serverApi";
 export const loginUser = async (shopCode: string, username: string, password: string) => {
   const apiUrl = await store.getApiUrl();
 
+  console.log("[LOGIN] url:", apiUrl, "shopCode:", shopCode, "username:", username);
   const res = await fetch(`${apiUrl}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -14,6 +15,7 @@ export const loginUser = async (shopCode: string, username: string, password: st
 
   if (!res.ok) {
     const err = await res.json();
+    console.log("[LOGIN] failed:", res.status, JSON.stringify(err));
     throw new Error(err.error ?? "Login failed");
   }
 
