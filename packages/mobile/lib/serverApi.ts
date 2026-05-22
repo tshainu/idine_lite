@@ -4,6 +4,7 @@
  * Local SQLite is a read cache — always write to server first, then refresh local.
  */
 import * as ImageManipulator from "expo-image-manipulator";
+import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 import { store } from "./store";
 import db from "./database";
@@ -251,32 +252,31 @@ export async function serverCreateOrder(order: {
 export async function uploadMenuImage(localUri: string): Promise<string> {
   const base = await getBase();
 
-  // Resize to max 400x400 at 0.7 quality — well under 50kb for a thumbnail
+  // Resize to max 400x400 at 0.7 quality
   const result = await ImageManipulator.manipulateAsync(
     localUri,
     [{ resize: { width: 400, height: 400 } }],
     { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
   );
 
-  // Upload — React Native fetch handles file:// URIs inside FormData natively
-  const formData = new FormData();
-  formData.append("image", {
-    uri: result.uri,
-    type: "image/jpeg",
-    name: "menu_image.jpg",
-  } as any);
+  // Use FileSystem.uploadAsync (MULTIPART) — fetch+FormData with file:// fails on Android
+  const uploadRes = await FileSystem.uploadAsync(
+    `${base}/api/upload/image`,
+    result.uri,
+    {
+      httpMethod: "POST",
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: "image",
+      mimeType: "image/jpeg",
+    }
+  );
 
-  const uploadRes = await fetch(`${base}/api/upload/image`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!uploadRes.ok) {
-    const err = await uploadRes.json().catch(() => ({}));
-    throw new Error((err as any)?.error ?? "Image upload failed");
+  if (uploadRes.status < 200 || uploadRes.status >= 300) {
+    const err = JSON.parse(uploadRes.body || "{}");
+    throw new Error(err?.error ?? `Image upload failed (${uploadRes.status})`);
   }
 
-  const data = await uploadRes.json();
+  const data = JSON.parse(uploadRes.body);
   return `${base}${data.url}`;
 }
 
