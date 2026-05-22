@@ -299,6 +299,7 @@ export default function BillingScreen() {
   const [kotModal, setKotModal] = useState(false);
   const [recentModal, setRecentModal] = useState(false);
   const [receiptModal, setReceiptModal] = useState(false);
+  const [printSuccessModal, setPrintSuccessModal] = useState(false);
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway">("dine-in");
   const [receiptData, setReceiptData] = useState<{
     billNo: number; date: string; time: string;
@@ -711,7 +712,7 @@ export default function BillingScreen() {
         if (!printerAddr) { Alert.alert("No Bluetooth Printer", "Set Bluetooth printer address in Settings."); return; }
         await printBluetooth(printerAddr, esc);
       }
-      Alert.alert("Printed", "Receipt sent to printer.");
+      setPrintSuccessModal(true);
     } catch (e: any) {
       Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
     }
@@ -793,7 +794,7 @@ export default function BillingScreen() {
         await printBluetooth(printerAddr, kotEsc);
       }
 
-      Alert.alert("Printed", "Bill & KOT sent to printer.");
+      setPrintSuccessModal(true);
     } catch (e: any) {
       Alert.alert("Print Failed", e?.message ?? "Could not reach printer.");
     }
@@ -1561,6 +1562,20 @@ export default function BillingScreen() {
           </View>
         </View>
       </Modal>
+      {/* ── Print Success Modal ── */}
+      <Modal visible={printSuccessModal} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={s.printSuccessCard}>
+            <View style={s.printSuccessIconWrap}>
+              <Check size={28} color="#fff" strokeWidth={3} />
+            </View>
+            <Text style={s.printSuccessText}>Done! Receipt Printed</Text>
+            <TouchableOpacity style={s.printSuccessBtn} onPress={() => setPrintSuccessModal(false)}>
+              <Text style={s.printSuccessBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1730,6 +1745,29 @@ const s = StyleSheet.create({
     padding: 24, width: "85%", maxWidth: 360,
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2, shadowRadius: 10, elevation: 8,
+  },
+  printSuccessCard: {
+    backgroundColor: "#fff", borderRadius: 20,
+    paddingVertical: 32, paddingHorizontal: 28,
+    width: "80%", maxWidth: 320, alignItems: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 10, elevation: 8,
+  },
+  printSuccessIconWrap: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: "#22C55E", alignItems: "center", justifyContent: "center",
+    marginBottom: 18,
+  },
+  printSuccessText: {
+    fontSize: 20, fontWeight: "700", color: "#1A1A1A",
+    textAlign: "center", marginBottom: 24,
+  },
+  printSuccessBtn: {
+    borderWidth: 2, borderColor: "#22C55E", borderRadius: 14,
+    paddingVertical: 10, paddingHorizontal: 48,
+  },
+  printSuccessBtnText: {
+    fontSize: 17, fontWeight: "700", color: "#1A1A1A",
   },
   modalRedTitle: {
     fontSize: 16, fontWeight: "700", color: Colors.red,
