@@ -252,31 +252,38 @@ export async function serverCreateOrder(order: {
 export async function uploadMenuImage(localUri: string): Promise<string> {
   const base = await getBase();
 
-  // Resize to max 400x400 at 0.7 quality
+  // Resize to 400x400, get base64 directly from manipulator
   const result = await ImageManipulator.manipulateAsync(
     localUri,
     [{ resize: { width: 400, height: 400 } }],
-    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
   );
 
-  // Use FileSystem.uploadAsync (MULTIPART) — fetch+FormData with file:// fails on Android
-  const uploadRes = await FileSystem.uploadAsync(
-    `${base}/api/upload/image`,
-    result.uri,
-    {
-      httpMethod: "POST",
-      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-      fieldName: "image",
-      mimeType: "image/jpeg",
-    }
-  );
-
-  if (uploadRes.status < 200 || uploadRes.status >= 300) {
-    const err = JSON.parse(uploadRes.body || "{}");
-    throw new Error(err?.error ?? `Image upload failed (${uploadRes.status})`);
+  // Read base64 from result or fallback to reading the saved file
+  let b64 = result.base64;
+  if (!b64) {
+    b64 = await FileSystem.readAsStringAsync(result.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
   }
 
-  const data = JSON.parse(uploadRes.body);
+  // Send as JSON with base64 — avoids all FormData/file:// issues on Android
+  const token = await store.getToken();
+  const uploadRes = await fetch(`${base}/api/upload/image-b64`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ image: b64, mimeType: "image/jpeg" }),
+  });
+
+  if (!uploadRes.ok) {
+    const err = await uploadRes.json().catch(() => ({}));
+    throw new Error((err as any)?.error ?? "Image upload failed");
+  }
+
+  const data = await uploadRes.json();
   return `${base}${data.url}`;
 }
 

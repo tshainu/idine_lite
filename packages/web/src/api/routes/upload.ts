@@ -11,6 +11,26 @@ if (!existsSync(UPLOADS_DIR)) {
   mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
+// POST /api/upload/image-b64  (base64 JSON — used by mobile to avoid FormData/file:// issues)
+upload.post("/image-b64", async (c) => {
+  try {
+    const { image, mimeType } = await c.req.json();
+    if (!image) return c.json({ error: "No image provided" }, 400);
+
+    const buffer = Buffer.from(image, "base64");
+    if (buffer.length > 200 * 1024) return c.json({ error: "Image too large (max 200kb)" }, 400);
+
+    const ext = mimeType === "image/png" ? ".png" : ".jpg";
+    const filename = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+    writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+
+    return c.json({ url: `/uploads/${filename}` });
+  } catch (e: any) {
+    console.error("Upload b64 error:", e);
+    return c.json({ error: "Upload failed" }, 500);
+  }
+});
+
 // POST /api/upload/image
 upload.post("/image", async (c) => {
   try {
