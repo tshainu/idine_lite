@@ -51,36 +51,20 @@ export const syncWithServer = async (): Promise<{ success: boolean; error?: stri
     // Upsert categories
     if (data.categories?.length > 0) {
       for (const cat of data.categories) {
-        const existing = db.getFirstSync("SELECT id FROM categories WHERE server_id = ?", [cat.id]);
-        if (existing) {
-          db.runSync(
-            "UPDATE categories SET name = ?, sort_order = ?, deleted_at = ? WHERE server_id = ?",
-            [cat.name, cat.sortOrder, cat.deletedAt ? new Date(cat.deletedAt).getTime() : null, cat.id]
-          );
-        } else {
-          db.runSync(
-            "INSERT OR IGNORE INTO categories (server_id, shop_id, name, sort_order, updated_at) VALUES (?, ?, ?, ?, ?)",
-            [cat.id, cat.shopId, cat.name, cat.sortOrder, Date.now()]
-          );
-        }
+        db.runSync(
+          "INSERT OR REPLACE INTO categories (id, server_id, shop_id, name, sort_order, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [cat.id, cat.id, cat.shopId, cat.name, cat.sortOrder, Date.now(), cat.deletedAt ? new Date(cat.deletedAt).getTime() : null]
+        );
       }
     }
 
     // Upsert products
     if (data.products?.length > 0) {
       for (const prod of data.products) {
-        const existing = db.getFirstSync("SELECT id FROM products WHERE server_id = ?", [prod.id]);
-        if (existing) {
-          db.runSync(
-            "UPDATE products SET name = ?, price = ?, description = ?, image_url = ?, category_id = ?, is_available = ?, deleted_at = ? WHERE server_id = ?",
-            [prod.name, prod.price, prod.description ?? null, prod.imageUrl ?? null, prod.categoryId, prod.isAvailable ? 1 : 0, prod.deletedAt ? new Date(prod.deletedAt).getTime() : null, prod.id]
-          );
-        } else {
-          db.runSync(
-            "INSERT OR IGNORE INTO products (server_id, shop_id, category_id, name, description, price, is_available, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [prod.id, prod.shopId, prod.categoryId, prod.name, prod.description ?? null, prod.price, prod.isAvailable ? 1 : 0, Date.now()]
-          );
-        }
+        db.runSync(
+          "INSERT OR REPLACE INTO products (id, server_id, shop_id, category_id, name, description, price, image_url, is_available, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [prod.id, prod.id, prod.shopId, prod.categoryId, prod.name, prod.description ?? null, prod.price, prod.imageUrl ?? null, prod.isAvailable ? 1 : 0, Date.now(), prod.deletedAt ? new Date(prod.deletedAt).getTime() : null]
+        );
       }
     }
 
