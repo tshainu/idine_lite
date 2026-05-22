@@ -668,11 +668,8 @@ export default function BillingScreen() {
 
     // Pre-render header image to ESC/POS raster bytes if available
     let headerEscBytes = "";
-    // DEBUG: show image state before trying to convert
-    Alert.alert("DBG: Header Image", `headerImage: ${data.headerImage ? `len=${data.headerImage.length} prefix=${data.headerImage.slice(0,40)}` : "NULL/UNDEFINED"}`);
     if (data.headerImage) {
       try {
-        Alert.alert("DBG: Step", "calling imageUriToEscPos...");
         const escResult = await Promise.race([
           imageUriToEscPos(data.headerImage, paperSize),
           new Promise<string>((_, reject) => setTimeout(() => reject(new Error("imageUriToEscPos timed out after 15s")), 15000)),
@@ -680,13 +677,9 @@ export default function BillingScreen() {
         headerEscBytes = escResult as string;
         if (!headerEscBytes) {
           console.warn("[billing] imageUriToEscPos returned empty for receipt");
-          Alert.alert("DBG: EscPos", "imageUriToEscPos returned empty string!");
-        } else {
-          Alert.alert("DBG: EscPos OK", `escBytes len=${headerEscBytes.length}`);
         }
       } catch (imgErr: any) {
         console.warn("[billing] imageUriToEscPos receipt failed:", imgErr);
-        Alert.alert("Header Image Error", `imageUriToEscPos failed: ${imgErr?.message ?? imgErr}`);
       }
     }
 

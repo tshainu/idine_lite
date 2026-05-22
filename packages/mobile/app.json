@@ -26,7 +26,7 @@
     "extra": {
       "apiUrl": "http://69.169.97.195",
       "eas": {
-        "projectId": "28821494-1a4f-4419-aa71-b1eb0a9226cd"
+        "projectId": "c0dcb808-5d81-4def-85c1-c47e6e45e26e"
       },
       "router": {}
     },
@@ -68,6 +68,6 @@
       ],
       "expo-document-picker"
     ],
-    "owner": "tshainoo"
+    "owner": "axisx1"
   }
 }
