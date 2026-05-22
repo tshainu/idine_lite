@@ -668,13 +668,20 @@ export default function BillingScreen() {
 
     // Pre-render header image to ESC/POS raster bytes if available
     let headerEscBytes = "";
+    // DEBUG: show image state before trying to convert
+    Alert.alert("DBG: Header Image", `headerImage: ${data.headerImage ? `len=${data.headerImage.length} prefix=${data.headerImage.slice(0,40)}` : "NULL/UNDEFINED"}`);
     if (data.headerImage) {
       try {
         headerEscBytes = await imageUriToEscPos(data.headerImage, paperSize);
-        if (!headerEscBytes) console.warn("[billing] imageUriToEscPos returned empty for receipt");
+        if (!headerEscBytes) {
+          console.warn("[billing] imageUriToEscPos returned empty for receipt");
+          Alert.alert("DBG: EscPos", "imageUriToEscPos returned empty string!");
+        } else {
+          Alert.alert("DBG: EscPos OK", `escBytes len=${headerEscBytes.length}`);
+        }
       } catch (imgErr: any) {
         console.warn("[billing] imageUriToEscPos receipt failed:", imgErr);
-        Alert.alert("Header Image Warning", `Could not render header image: ${imgErr?.message ?? imgErr}. Printing with text header.`);
+        Alert.alert("Header Image Error", `imageUriToEscPos failed: ${imgErr?.message ?? imgErr}`);
       }
     }
 
@@ -963,7 +970,7 @@ export default function BillingScreen() {
           ) : cart.map((item, idx) => (
             <TouchableOpacity key={idx} style={s.tableRow} onPress={() => updateQty(idx, 1)} onLongPress={() => updateQty(idx, -1)}>
               <Text style={[s.td, { width: 22, fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{idx + 1}.</Text>
-              <Text style={[s.td, { flex: 1, minHeight: 32 }]} numberOfLines={2} ellipsizeMode="tail">{item.productName}</Text>
+              <Text style={[s.td, { flex: 1, minHeight: 16 }]} numberOfLines={2} ellipsizeMode="tail">{item.productName}</Text>
               <Text style={[s.td, { width: 32, fontSize: 11, minHeight: 16, paddingTop: 1 }]} numberOfLines={1}>{item.portionName ?? "-"}</Text>
               <Text style={[s.td, { width: 30, textAlign: "center", fontWeight: "700", minHeight: 16, paddingTop: 1 }]}>{item.qty}</Text>
               <Text style={[s.td, { width: 52, textAlign: "right", fontSize: 11, minHeight: 16, paddingTop: 1 }]}>{item.unitPrice.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</Text>
