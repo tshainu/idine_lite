@@ -677,10 +677,10 @@ export default function BillingScreen() {
         ]);
         headerEscBytes = escResult as string;
         if (!headerEscBytes) {
-          console.warn("[billing] imageUriToEscPos returned empty for receipt");
+          Alert.alert("Header Image Warning", "Header image conversion returned empty. Printing with text header.");
         }
       } catch (imgErr: any) {
-        console.warn("[billing] imageUriToEscPos receipt failed:", imgErr);
+        Alert.alert("Header Image Warning", `Could not render header: ${imgErr?.message ?? imgErr}. Printing with text header.`);
       }
     }
 
@@ -726,7 +726,7 @@ export default function BillingScreen() {
     if (data.headerImage) {
       try {
         billHeaderEscBytes = await imageUriToEscPos(data.headerImage, paperSize);
-        if (!billHeaderEscBytes) console.warn("[billing] imageUriToEscPos returned empty for bill");
+        if (!billHeaderEscBytes) Alert.alert("Header Image Warning", "Header image conversion returned empty. Printing with text header.");
       } catch (imgErr: any) {
         console.warn("[billing] imageUriToEscPos bill failed:", imgErr);
         Alert.alert("Header Image Warning", `Could not render header image: ${imgErr?.message ?? imgErr}. Printing with text header.`);
@@ -1564,7 +1564,7 @@ export default function BillingScreen() {
       </Modal>
       {/* ── Print Success Modal ── */}
       <Modal visible={printSuccessModal} transparent animationType="fade">
-        <View style={s.modalOverlay}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" }}>
           <View style={s.printSuccessCard}>
             <View style={s.printSuccessIconWrap}>
               <Check size={28} color="#fff" strokeWidth={3} />
