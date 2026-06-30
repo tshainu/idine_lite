@@ -214,21 +214,36 @@ export async function imageUriToEscPos(uri: string, paper: PaperSize): Promise<s
       console.log(`[imageToEscPos] wrote data URL to temp file: ${tmpPath}`);
     }
 
-    // Step 2: resize to paper width and get base64 PNG
+    // Step 2: resize to paper width (and cap height) then get base64 PNG.
+    // Max header height: 58mm → 160px, 80mm → 200px.
+    // Without a height cap, a tall image creates a huge ESC/POS payload that
+    // overflows the printer buffer and causes partial prints.
+    const maxHeightPx = paper === "80" ? 200 : 160;
     const result = await ImageManipulator.manipulateAsync(
       manipulateUri,
       [{ resize: { width: paperWidthPx } }],
       { format: ImageManipulator.SaveFormat.PNG, base64: true }
     );
 
-    console.log(`[imageToEscPos] manipulateAsync done uri=${result.uri} base64len=${result.base64?.length ?? "null"}`);
+    // If the resized image is still too tall, shrink it to maxHeightPx
+    let finalResult = result;
+    if (result.height && result.height > maxHeightPx) {
+      console.log(`[imageToEscPos] image height ${result.height}px > ${maxHeightPx}px cap — resizing again`);
+      finalResult = await ImageManipulator.manipulateAsync(
+        result.uri,
+        [{ resize: { height: maxHeightPx } }],
+        { format: ImageManipulator.SaveFormat.PNG, base64: true }
+      );
+    }
+
+    console.log(`[imageToEscPos] manipulateAsync done uri=${finalResult.uri} base64len=${finalResult.base64?.length ?? "null"}`);
 
     // Get base64 — prefer inline result, fallback to reading the saved file
-    let b64: string | null = result.base64 ?? null;
+    let b64: string | null = finalResult.base64 ?? null;
     if (!b64) {
-      console.warn("[imageToEscPos] result.base64 was null, reading from file:", result.uri);
+      console.warn("[imageToEscPos] result.base64 was null, reading from file:", finalResult.uri);
       try {
-        b64 = await FileSystem.readAsStringAsync(result.uri, {
+        b64 = await FileSystem.readAsStringAsync(finalResult.uri, {
           encoding: FileSystem.EncodingType.Base64,
         });
         console.log(`[imageToEscPos] read from file ok, len=${b64?.length}`);

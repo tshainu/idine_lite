@@ -356,15 +356,23 @@ export async function printWifi(ip: string, port: number, escposData: string): P
     };
 
     const timer = setTimeout(() => {
-      done(new Error("Connection timed out after 8s"));
-    }, 8000);
+      done(new Error("Connection timed out after 15s"));
+    }, 15000);
 
     client = TcpSocket.createConnection({ host: ip, port }, () => {
-      client.write(escposData, "binary", (err: any) => {
-        done(err);
+      // Use Buffer.from for safe binary byte transmission (avoids JS string encoding quirks)
+      const buf = Buffer.from(escposData, "binary");
+      client.write(buf, (err: any) => {
+        if (err) { done(err); return; }
+        // Gracefully close the write side — do NOT destroy() immediately.
+        // destroy() kills the socket before the OS finishes flushing large payloads
+        // (image data = many TCP segments). end() sends FIN after all data is sent,
+        // and the 'close' event fires only when the connection is truly done.
+        try { client.end(); } catch { done(); }
       });
     });
     client.on("error", (err: any) => done(err));
+    // Resolve only on actual close — guarantees all data was transmitted
     client.on("close", () => done());
   });
 }
@@ -387,8 +395,13 @@ export async function printBluetooth(address: string, escposData: string): Promi
   const dev = await RNBt.connectToDevice(address);
   if (!dev) throw new Error("Bluetooth device connection returned null.");
   try {
-    await dev.write(escposData, "binary");
-    await new Promise(r => setTimeout(r, 500));
+    // Convert to Buffer for safe binary byte transmission
+    const buf = Buffer.from(escposData, "binary");
+    await dev.write(buf);
+    // Wait for BT SPP to flush — image data (~10-30KB) needs more than 500ms.
+    // Scale wait time with payload size: ~1ms per 10 bytes, clamped 800-4000ms.
+    const waitMs = Math.max(800, Math.min(4000, Math.floor(buf.length / 10)));
+    await new Promise(r => setTimeout(r, waitMs));
   } finally {
     try { await dev.disconnect(); } catch { /* ignore */ }
   }
