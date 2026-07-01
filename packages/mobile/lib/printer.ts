@@ -360,8 +360,11 @@ export async function printWifi(ip: string, port: number, escposData: string): P
     }, 15000);
 
     client = TcpSocket.createConnection({ host: ip, port }, () => {
-      // Use Buffer.from for safe binary byte transmission (avoids JS string encoding quirks)
-      const buf = Buffer.from(escposData, "binary");
+      // Convert ESC/POS string to Uint8Array (Buffer is not available in Hermes/RN)
+      const buf = new Uint8Array(escposData.length);
+      for (let i = 0; i < escposData.length; i++) {
+        buf[i] = escposData.charCodeAt(i) & 0xff;
+      }
       client.write(buf, (err: any) => {
         if (err) { done(err); return; }
         // Gracefully close the write side — do NOT destroy() immediately.
@@ -395,8 +398,11 @@ export async function printBluetooth(address: string, escposData: string): Promi
   const dev = await RNBt.connectToDevice(address);
   if (!dev) throw new Error("Bluetooth device connection returned null.");
   try {
-    // Convert to Buffer for safe binary byte transmission
-    const buf = Buffer.from(escposData, "binary");
+    // Convert ESC/POS string to Uint8Array (Buffer is not available in Hermes/RN)
+    const buf = new Uint8Array(escposData.length);
+    for (let i = 0; i < escposData.length; i++) {
+      buf[i] = escposData.charCodeAt(i) & 0xff;
+    }
     await dev.write(buf);
     // Wait for BT SPP to flush — image data (~10-30KB) needs more than 500ms.
     // Scale wait time with payload size: ~1ms per 10 bytes, clamped 800-4000ms.

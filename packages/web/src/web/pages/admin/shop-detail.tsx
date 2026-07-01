@@ -106,6 +106,12 @@ export default function ShopDetail() {
   // Edit user form
   const [editUserForm, setEditUserForm] = useState({ role: "cashier", isActive: true, password: "" });
   const [showEditUserPw, setShowEditUserPw] = useState(false);
+  // Reset password modal
+  const [resetPwUser, setResetPwUser] = useState<User | null>(null);
+  const [resetPwValue, setResetPwValue] = useState("");
+  const [showResetPw, setShowResetPw] = useState(false);
+  const [resetPwVisible, setResetPwVisible] = useState(false);
+  const [resetPwDone, setResetPwDone] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -186,6 +192,18 @@ export default function ShopDetail() {
       await adminApi.users.deactivate(shopId, user.id);
       await load();
     } catch (e: any) { setError(e.message); }
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetPwUser || !resetPwValue) return;
+    setSaving(true);
+    setFormError("");
+    try {
+      await adminApi.users.update(shopId, resetPwUser.id, { password: resetPwValue });
+      setResetPwDone(true);
+    } catch (e: any) { setFormError(e.message); }
+    finally { setSaving(false); }
   }
 
   function handleCodeChange(val: string) {
@@ -282,6 +300,9 @@ export default function ShopDetail() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-mono px-2 py-0.5 bg-gray-100 text-gray-500 rounded">
+                  #{shop.id}
+                </span>
                 <h2 className="text-xl font-bold text-gray-900">{shop.name}</h2>
                 {!shop.isActive && (
                   <span className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
@@ -290,7 +311,7 @@ export default function ShopDetail() {
                 )}
               </div>
               <p className="text-sm text-gray-400 mt-0.5">
-                Code: <span className="font-mono text-gray-600">{shop.code}</span>
+                Code: <span className="font-mono font-semibold text-gray-700">{shop.code}</span>
                 {shop.address ? ` · ${shop.address}` : ""}
                 {shop.phone ? ` · ${shop.phone}` : ""}
               </p>
@@ -422,6 +443,19 @@ export default function ShopDetail() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
+                        setResetPwUser(u);
+                        setResetPwValue("");
+                        setResetPwDone(false);
+                        setShowResetPw(true);
+                        setFormError("");
+                      }}
+                      className="text-xs text-amber-600 hover:text-amber-700 px-3 py-1.5
+                                 rounded-lg hover:bg-amber-50 transition-colors"
+                    >
+                      Reset PW
+                    </button>
+                    <button
+                      onClick={() => {
                         setEditUser(u);
                         setEditUserForm({ role: u.role, isActive: u.isActive, password: "" });
                         setFormError("");
@@ -494,6 +528,76 @@ export default function ShopDetail() {
           </div>
         </div>
       </div>
+
+      {/* Reset Password modal */}
+      {showResetPw && resetPwUser && (
+        <Modal title={`Reset Password — ${resetPwUser.username}`} onClose={() => { setShowResetPw(false); setResetPwUser(null); setResetPwDone(false); setResetPwVisible(false); setFormError(""); }}>
+          {resetPwDone ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-xs text-green-700 font-medium mb-2">Password reset successfully!</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500">Username</p>
+                  <p className="font-mono text-sm font-bold text-gray-900">{resetPwUser.username}</p>
+                  <p className="text-xs text-gray-500 mt-2">New Password</p>
+                  <p className="font-mono text-sm font-bold text-gray-900 bg-yellow-50 border border-yellow-200 rounded px-3 py-2 select-all">
+                    {resetPwValue}
+                  </p>
+                </div>
+                <p className="text-xs text-amber-600 mt-3">Copy and share this password — it won't be shown again.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowResetPw(false); setResetPwUser(null); setResetPwDone(false); }}
+                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <Field label="New Password">
+                <div className="relative">
+                  <input
+                    type={resetPwVisible ? "text" : "password"}
+                    value={resetPwValue}
+                    onChange={(e) => setResetPwValue(e.target.value)}
+                    required
+                    minLength={4}
+                    placeholder="Enter new password"
+                    className="w-full px-3.5 py-2.5 pr-20 rounded-lg border border-gray-300 text-sm
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setResetPwVisible(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    {resetPwVisible ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </Field>
+              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowResetPw(false); setResetPwUser(null); setResetPwVisible(false); setFormError(""); }}
+                  className="flex-1 px-4 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !resetPwValue}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 rounded-lg transition-colors"
+                >
+                  {saving ? "Saving..." : "Reset Password"}
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
+      )}
 
       {/* Edit shop modal */}
       {showEdit && (
