@@ -25,6 +25,7 @@ export const users = sqliteTable("users", {
   shopId: integer("shop_id").notNull().references(() => shops.id),
   username: text("username").notNull(),
   passwordHash: text("password_hash").notNull(),
+  plainPassword: text("plain_password"),
   role: text("role", { enum: ["admin", "cashier"] }).notNull().default("cashier"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(false),

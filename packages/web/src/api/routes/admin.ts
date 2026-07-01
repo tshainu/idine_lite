@@ -161,6 +161,7 @@ export const admin = new Hono()
       shopId: shop.id,
       username,
       passwordHash: hash,
+      plainPassword: generatedPassword,
       role: "admin",
       mustChangePassword: true,
     });
@@ -176,6 +177,7 @@ export const admin = new Hono()
     const users = await db.select({
       id: schema.users.id,
       username: schema.users.username,
+      plainPassword: schema.users.plainPassword,
       role: schema.users.role,
       isActive: schema.users.isActive,
       createdAt: schema.users.createdAt,
@@ -275,7 +277,7 @@ export const admin = new Hono()
     if (!username || !password) return c.json({ error: "username and password required" }, 400);
     const hash = await bcrypt.hash(password, 10);
     const [user] = await db.insert(schema.users).values({
-      shopId, username, passwordHash: hash, role: role ?? "cashier",
+      shopId, username, passwordHash: hash, plainPassword: password, role: role ?? "cashier",
     }).returning();
     return c.json({ user: { id: user.id, username: user.username, role: user.role } }, 201);
   })
@@ -286,7 +288,7 @@ export const admin = new Hono()
     const update: any = { updatedAt: new Date() };
     if (role !== undefined) update.role = role;
     if (isActive !== undefined) update.isActive = isActive;
-    if (password) update.passwordHash = await bcrypt.hash(password, 10);
+    if (password) { update.passwordHash = await bcrypt.hash(password, 10); update.plainPassword = password; }
     const [user] = await db.update(schema.users).set(update).where(eq(schema.users.id, id)).returning();
     return c.json({ user }, 200);
   })

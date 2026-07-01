@@ -25,10 +25,10 @@
     },
     "extra": {
       "apiUrl": "http://69.169.97.195",
+      "router": {},
       "eas": {
-        "projectId": "c0dcb808-5d81-4def-85c1-c47e6e45e26e"
-      },
-      "router": {}
+        "projectId": "bd728677-5071-4474-b049-16b5858318ce"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.idinelite_r7k2.runable",
@@ -40,7 +40,7 @@
       "backgroundColor": "#1A73C8"
     },
     "name": "iDine Lite",
-    "slug": "idine-lite",
+    "slug": "idine-lite-ts",
     "version": "1.0.19",
     "scheme": "idine-lite",
     "orientation": "portrait",
@@ -68,6 +68,6 @@
       ],
       "expo-document-picker"
     ],
-    "owner": "axisx1"
+    "owner": "idine"
   }
 }
