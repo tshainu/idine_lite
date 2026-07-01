@@ -27,7 +27,7 @@ export const admin = new Hono()
   // ── Auth ──────────────────────────────────────────────────────────────────
   .post("/login", async (c) => {
     const { password } = await c.req.json();
-    const expected = process.env.SUPER_ADMIN_PASSWORD ?? "admin123";
+    const expected = process.env.SUPER_ADMIN_PASSWORD ?? "Asdasd@123";
     if (!password || password !== expected) {
       return c.json({ error: "Invalid password" }, 401);
     }
