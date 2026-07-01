@@ -127,6 +127,12 @@ export const portionTemplates = sqliteTable("portion_templates", {
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
 });
 
+// Settings (key-value store for system config)
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 // Sync Log (server side — track what was pushed per device)
 export const syncLog = sqliteTable("sync_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),

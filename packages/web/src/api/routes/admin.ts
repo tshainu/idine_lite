@@ -27,7 +27,10 @@ export const admin = new Hono()
   // ── Auth ──────────────────────────────────────────────────────────────────
   .post("/login", async (c) => {
     const { password } = await c.req.json();
-    const expected = process.env.SUPER_ADMIN_PASSWORD ?? "Asdasd@123";
+    const envDefault = process.env.SUPER_ADMIN_PASSWORD ?? "Asdasd@123";
+    // Check if password was changed via UI (stored in DB)
+    const [setting] = await db.select().from(schema.settings).where(eq(schema.settings.key, "super_admin_password")).catch(() => []) as any[];
+    const expected = setting?.value ?? envDefault;
     if (!password || password !== expected) {
       return c.json({ error: "Invalid password" }, 401);
     }
@@ -39,6 +42,28 @@ export const admin = new Hono()
   .post("/logout", requireAdmin, async (c) => {
     const token = c.req.header("Authorization")?.replace("Bearer ", "").trim() ?? "";
     activeSessions.delete(token);
+    return c.json({ success: true }, 200);
+  })
+
+  .post("/change-password", requireAdmin, async (c) => {
+    const { currentPassword, newPassword } = await c.req.json();
+    const expected = process.env.SUPER_ADMIN_PASSWORD ?? "Asdasd@123";
+    // Check against current override in DB if set
+    const [setting] = await db.select().from(schema.settings).where(eq(schema.settings.key, "super_admin_password")).catch(() => [null]) as any[];
+    const current = setting?.value ?? expected;
+    if (!currentPassword || currentPassword !== current) {
+      return c.json({ error: "Current password is incorrect" }, 401);
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return c.json({ error: "New password must be at least 6 characters" }, 400);
+    }
+    // Store new password in DB settings
+    const existing = await db.select().from(schema.settings).where(eq(schema.settings.key, "super_admin_password")).catch(() => []) as any[];
+    if (existing.length > 0) {
+      await db.update(schema.settings).set({ value: newPassword }).where(eq(schema.settings.key, "super_admin_password")).catch(() => {});
+    } else {
+      await db.insert(schema.settings).values({ key: "super_admin_password", value: newPassword }).catch(() => {});
+    }
     return c.json({ success: true }, 200);
   })
 

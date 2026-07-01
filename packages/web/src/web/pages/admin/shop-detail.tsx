@@ -99,6 +99,8 @@ export default function ShopDetail() {
   // Edit shop form
   const [editForm, setEditForm] = useState({ name: "", code: "", address: "", phone: "" });
   const [codeError, setCodeError] = useState("");
+  // Inline reset pw inside edit modal
+  const [editResetPw, setEditResetPw] = useState<{ userId: number; username: string; value: string; visible: boolean; done: boolean } | null>(null);
   const codeCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Add user form
   const [userForm, setUserForm] = useState({ username: "", password: "", role: "cashier" });
@@ -154,6 +156,18 @@ export default function ShopDetail() {
     try {
       await adminApi.shops.update(shopId, editForm);
       setShowEdit(false);
+      await load();
+    } catch (e: any) { setFormError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function handleEditModalResetPw() {
+    if (!editResetPw || !editResetPw.value) return;
+    setSaving(true);
+    setFormError("");
+    try {
+      await adminApi.users.update(shopId, editResetPw.userId, { password: editResetPw.value });
+      setEditResetPw(prev => prev ? { ...prev, done: true } : null);
       await load();
     } catch (e: any) { setFormError(e.message); }
     finally { setSaving(false); }
@@ -665,11 +679,76 @@ export default function ShopDetail() {
             <Field label="Phone">
               <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="07XXXXXXXX" />
             </Field>
+
+            {/* Reset User Password section */}
+            {users.length > 0 && (
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Reset User Password</p>
+                {!editResetPw ? (
+                  <div className="space-y-1.5">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => setEditResetPw({ userId: u.id, username: u.username, value: "", visible: false, done: false })}
+                        className="flex items-center justify-between w-full px-3 py-2 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-left"
+                      >
+                        <div>
+                          <span className="text-sm font-medium text-gray-800">{u.username}</span>
+                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${u.role === "admin" ? "bg-indigo-50 text-indigo-600" : "bg-gray-100 text-gray-500"}`}>{u.role}</span>
+                        </div>
+                        <span className="text-xs text-amber-600 font-medium">Reset PW →</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : editResetPw.done ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+                    Password for <strong>{editResetPw.username}</strong> reset successfully!
+                    <button type="button" onClick={() => setEditResetPw(null)} className="ml-2 text-xs underline">Reset another</button>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-amber-800">Reset password for: <strong>{editResetPw.username}</strong></p>
+                      <button type="button" onClick={() => setEditResetPw(null)} className="text-xs text-gray-400 hover:text-gray-600">✕ Cancel</button>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type={editResetPw.visible ? "text" : "password"}
+                          value={editResetPw.value}
+                          onChange={e => setEditResetPw(prev => prev ? { ...prev, value: e.target.value } : null)}
+                          placeholder="New password"
+                          minLength={4}
+                          className="w-full px-3 py-2 pr-14 rounded-lg border border-amber-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditResetPw(prev => prev ? { ...prev, visible: !prev.visible } : null)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {editResetPw.visible ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleEditModalResetPw}
+                        disabled={saving || !editResetPw.value}
+                        className="px-3 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        {saving ? "..." : "Set PW"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {formError && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</div>
             )}
             <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => { setShowEdit(false); setFormError(""); setCodeError(""); }}
+              <button type="button" onClick={() => { setShowEdit(false); setFormError(""); setCodeError(""); setEditResetPw(null); }}
                 className="flex-1 px-4 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
