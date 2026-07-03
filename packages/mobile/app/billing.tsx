@@ -510,12 +510,12 @@ export default function BillingScreen() {
     else setPortionModal(null);
   };
 
-  const addToCart = (product: Product, portion?: Portion) => {
+  const addToCart = (product: Product, portion?: Portion, qty: number = 1) => {
     setCart((prev) => {
       const idx = prev.findIndex((i) => i.productId === product.id && i.portionId === (portion?.id));
       if (idx >= 0) {
         const updated = [...prev];
-        updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 };
+        updated[idx] = { ...updated[idx], qty: updated[idx].qty + qty };
         return updated;
       }
       return [...prev, {
@@ -523,7 +523,7 @@ export default function BillingScreen() {
         portionId: portion?.id,
         productName: product.name,
         portionName: portion?.name,
-        qty: 1,
+        qty,
         unitPrice: portion?.price ?? product.price,
       }];
     });
@@ -539,6 +539,25 @@ export default function BillingScreen() {
       addToCart(product);
     }
   };
+
+  // ── Bulk qty modal for no-portion items (long press) ──
+  const [bulkQtyProduct, setBulkQtyProduct] = useState<Product | null>(null);
+  const [bulkQtyValue, setBulkQtyValue] = useState(0);
+
+  const openBulkQtyModal = (product: Product) => {
+    if (product.portions.length > 0) return; // only for no-portion items
+    setBulkQtyValue(0);
+    setBulkQtyProduct(product);
+  };
+
+  const confirmBulkQty = () => {
+    if (bulkQtyProduct && bulkQtyValue > 0) {
+      addToCart(bulkQtyProduct, undefined, bulkQtyValue);
+    }
+    setBulkQtyProduct(null);
+    setBulkQtyValue(0);
+  };
+
 
   const updateQty = (idx: number, delta: number) => {
     setCart((prev) => {
@@ -930,7 +949,13 @@ export default function BillingScreen() {
         }
         renderItem={({ item }) => (
           <View style={[s.card, { width: ITEM_W, flexDirection: "column" }]}>
-            <TouchableOpacity style={s.cardImgWrap} onPress={() => handleSelectProduct(item)} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={s.cardImgWrap}
+              onPress={() => handleSelectProduct(item)}
+              onLongPress={() => openBulkQtyModal(item)}
+              delayLongPress={400}
+              activeOpacity={0.85}
+            >
               {item.image_url
                 ? <Image source={{ uri: item.image_url }} style={s.cardImg} resizeMode="cover" />
                 : <View style={s.cardImgPlaceholder}><Text style={s.cardImgEmoji}>🍽️</Text></View>
@@ -939,7 +964,13 @@ export default function BillingScreen() {
             <View style={[s.cardBody, { flex: 1 }]}>
               <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
             </View>
-            <TouchableOpacity style={s.selectBtn} onPress={() => handleSelectProduct(item)} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={s.selectBtn}
+              onPress={() => handleSelectProduct(item)}
+              onLongPress={() => openBulkQtyModal(item)}
+              delayLongPress={400}
+              activeOpacity={0.8}
+            >
               <Text style={s.selectBtnText}>Select</Text>
             </TouchableOpacity>
           </View>
@@ -1104,6 +1135,61 @@ export default function BillingScreen() {
                 <Text style={s.modalBtnText}>Confirm</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.modalBtn, s.modalBtnRed]} onPress={() => setPortionModal(null)}>
+                <Text style={s.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Bulk Qty Modal (long-press, no-portion items) ── */}
+      <Modal visible={!!bulkQtyProduct} transparent animationType="fade">
+        <View style={s.overlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalItemName}>{bulkQtyProduct?.name}</Text>
+            <Text style={s.portionPickPrice}>LKR.{bulkQtyProduct?.price.toFixed(2)}</Text>
+
+            {/* Quick qty grid */}
+            <View style={{ flexDirection: "row", gap: 6, marginTop: Spacing.md }}>
+              {[5, 10, 15, 20, 25, 50].map((q) => {
+                const active = bulkQtyValue === q;
+                return (
+                  <TouchableOpacity
+                    key={q}
+                    style={[s.quickQtyBtn, active && s.quickQtyBtnActive, { flex: 1 }]}
+                    onPress={() => setBulkQtyValue(q)}
+                  >
+                    <Text style={[s.quickQtyText, active && s.quickQtyTextActive]}>{q}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* +/- with editable qty */}
+            <View style={[s.qtyRow, { justifyContent: "center", marginTop: Spacing.md }]}>
+              <TouchableOpacity style={s.qtyBtn} onPress={() => setBulkQtyValue((v) => Math.max(0, v - 1))}>
+                <Text style={s.qtyBtnText}>−</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={s.qtyNumInput}
+                value={String(bulkQtyValue)}
+                keyboardType="number-pad"
+                onChangeText={(t) => {
+                  const n = parseInt(t, 10);
+                  setBulkQtyValue(isNaN(n) ? 0 : Math.max(0, n));
+                }}
+              />
+              <TouchableOpacity style={s.qtyBtn} onPress={() => setBulkQtyValue((v) => v + 1)}>
+                <Text style={s.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Confirm / Cancel */}
+            <View style={s.modalBtnRow}>
+              <TouchableOpacity style={[s.modalBtn, s.modalBtnGreen]} onPress={confirmBulkQty}>
+                <Text style={s.modalBtnText}>Confirm</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.modalBtn, s.modalBtnRed]} onPress={() => setBulkQtyProduct(null)}>
                 <Text style={s.modalBtnText}>Cancel</Text>
               </TouchableOpacity>
             </View>
